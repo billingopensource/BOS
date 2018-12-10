@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.api.repository.ReportRepository">
+	<select id="getTotalCustomerandContract" resultType="CustomerContractTotalOutput"  parameterType = "reportInput">
+	    select  total_customer_register
+	       ,current_customer_register
+	       ,total_contract_register
+	       ,current_contract_register
+		from 
+			(
+			select sum(totalsum) as total_customer_register
+			      ,sum(current_customer_register) as current_customer_register
+			from (      
+				select 1 as totalsum 
+				       ,case when c.createdate = replace(#{calfromDate},'-','') then 1 else 0 end as current_customer_register 
+				from customer c
+				where c.providernumber = #{providernumber}
+				) a
+			)	a1
+			,(
+			select sum(total_contract_register) as total_contract_register
+			      ,sum(current_contract_register) as current_contract_register
+			from (      
+				select case when c.effectenddatetime >= replace(#{calfromDate},'-','') then 1 else 0 end as total_contract_register
+				      ,case when c.effectstartdatetime = replace(#{calfromDate},'-','') then 1 else 0 end as current_contract_register 
+				from contract c
+				where c.providernumber = #{providernumber}
+				) a
+			) a2
+    </select>
+    
+    <select id="getRatioProduct" resultType="ProductRatioOutput" parameterType = "reportInput">
+	select case when (t2.ranking <![CDATA[<]]> 6) then productname else '기타' end as productnm,
+		   case when (t2.ranking <![CDATA[<]]> 6) then t2.cnt else sum(t2.cnt) end as productcnt,
+		   case when (t2.ranking <![CDATA[<]]> 6) then truncate(t2.cnt/t2.totalCount*100,1) else truncate((sum(t2.cnt)/t2.totalCount*100),1) end as productratio,
+		   t2.ranking
+	from (
+	 select prod.productname, prod.cnt, t1.totalCount, RANK() OVER(ORDER BY prod.cnt DESC) AS ranking
+	 from 
+	 (
+	  select 'PRODUCT' as gubun
+	      ,   p.productname  
+	      ,   count(c.connumber) as cnt
+	    from contract  c
+	       , customer cu
+	       , contractproduct cp
+	       , product p
+	    where cu.providernumber = #{providernumber}
+	    and c.providernumber = cu.providernumber
+	    and c.customernumber = cu.customernumber
+	    and c.connumber = cp.connumber
+	    and c.providernumber =  p.providernumber
+	    and cp.productid = p.productid
+	    and cp.producttype in ('NORMAL','COUPONCOUNT','COUPONPRICE')
+	    and  date_format(now(), '%Y%m%d') between c.effectstartdatetime and c.effectenddatetime
+	    group by 'PRODUCT', p.productname
+	        union all
+	    select  'PACKAGE' as gubun
+	         ,   p.productname  
+	         ,   count(c.connumber) as cnt
+	    from contract  c
+	       , customer cu
+	       , contractproduct cp
+	       , product p
+	    where cu.providernumber = #{providernumber}
+	    and c.providernumber = cu.providernumber
+	    and c.customernumber = cu.customernumber
+	    and c.connumber = cp.connumber
+	    and cp.producttype = 'PACKAGE'
+	    and cp.productid = p.productid
+	    and p.producttype = 'PACKAGE'
+	    and  date_format(now(), '%Y%m%d') between c.effectstartdatetime and c.effectenddatetime
+	    group by 'PACKAGE', p.productname
+	 )prod, (select count(c1.connumber) as totalCount 
+	     from contract c1 
+	     where date_format(now(), '%Y%m%d') between c1.effectstartdatetime and c1.effectenddatetime) t1
+	 group by prod.productname
+	 order by ranking
+	) t2
+	group by productnm
+	order by ranking
+    </select>
+ 
+ <select id="getRatioProductRank" resultType="ProductRatioOutput" parameterType = "reportInput" >
+	select case when (t2.ranking <![CDATA[<]]> 6) then productname else '기타' end as productnm,
+   case when (t2.ranking <![CDATA[<]]> 6) then t2.cnt else sum(t2.cnt) end as productcnt
+		from (
+		 select prod.productname, prod.cnt, t1.totalCount, RANK() OVER(ORDER BY prod.cnt DESC) AS ranking
+		 from 
+		 (
+		  select 'PRODUCT' as gubun
+		      ,   p.productname  
+		      ,   count(c.connumber) as cnt
+		    from contract  c
+		       , customer cu
+		       , contractproduct cp
+		       , product p
+		    where cu.providernumber = #{providernumber}
+		    and c.providernumber = cu.providernumber
+		    and c.customernumber = cu.customernumber
+		    and c.connumber = cp.connumber
+		    and c.providernumber =  p.providernumber
+		    and cp.productid = p.productid
+		    and cp.producttype in ('NORMAL','COUPONCOUNT','COUPONPRICE')
+		    and date_format(now(), '%Y%m%d') between c.effectstartdatetime and c.effectenddatetime
+		    and c.effectstartdatetime like concat(#{calfromDate},'%')
+		    group by 'PRODUCT', p.productname
+		        union all
+		    select  'PACKAGE' as gubun
+		         ,   p.productname  
+		         ,   count(c.connumber) as cnt
+		    from contract  c
+		       , customer cu
+		       , contractproduct cp
+		       , product p
+		    where cu.providernumber = #{providernumber}
+		    and c.providernumber = cu.providernumber
+		    and c.customernumber = cu.customernumber
+		    and c.connumber = cp.connumber
+		    and cp.producttype = 'PACKAGE'
+		    and cp.productid = p.productid
+		    and p.producttype = 'PACKAGE'
+		    and  date_format(now(), '%Y%m%d') between c.effectstartdatetime and c.effectenddatetime
+		    and c.effectstartdatetime like concat(#{calfromDate},'%')
+		    group by 'PACKAGE', p.productname
+		 )prod, (select count(c1.connumber) as totalCount 
+		     from contract c1 
+		     where date_format(now(), '%Y%m%d') between c1.effectstartdatetime and c1.effectenddatetime) t1
+		 group by prod.productname
+		 order by ranking
+		) t2
+group by productnm
+order by ranking
+limit 5
+    </select>
+
+<select id="getInvoiceReportOutput" resultType="InvoiceReportOutput" parameterType = "reportInput" >
+	select 
+		 invYm
+		,thismonthtotalInvoiceAmount
+		,thismonthtotalCollectionBalanceAmount
+		,todaytotalInvoiceAmount
+		,todaytotalCollectionBalanceAmount
+		,totalCollectionBalanceAmount
+	from
+		(
+		select date_format(inv.invoicedate, "%Y%m") as invYm, sum(inv.invoiceamount) as thismonthtotalInvoiceAmount, sum(inv.collectionBalanceAmount) as thismonthtotalCollectionBalanceAmount 
+		from invoice inv
+		where inv.invoicedate between concat(date_format(now(), "%Y%m"), '01') and date_format(LAST_DAY (now()), "%Y%m%d") and providernumber = #{providernumber}
+		) a1,
+		(
+		select inv.invoicedate, sum(inv.invoiceamount) as todaytotalInvoiceAmount, sum(inv.collectionBalanceAmount) as todaytotalCollectionBalanceAmount 
+		from invoice inv
+		where inv.invoicedate = date_format(now(), "%Y%m%d") and providernumber = #{providernumber}
+		) a2,
+		(
+		select sum(inv.collectionBalanceAmount) as totalCollectionBalanceAmount 
+		from invoice inv where providernumber = #{providernumber}
+		) a3
+    </select>    
+
+
+<select id="getInvoiceReportMonthOutput" resultType="InvoiceMonthlyOutput" parameterType = "reportInput" >
+	select date_format(inv.invoicedate, "%Y%m") as salemonthym
+	     , sum(inv.invoiceamount) as salemonthamt
+		from invoice inv
+		where providernumber = #{providernumber}
+		group by salemonthym
+		order by 1
+		limit 8
+    </select>  
+ 
+    
+ <insert id="insertArticle"  useGeneratedKeys="true" keyProperty="articlenum" >
+     insert into article 
+     (articlesubject
+	 ,articlecontent
+	 ,writedate
+	 ,viewyn
+	 ,providernumber) values 
+	 ( #{articlesubject}
+	 , #{articlecontent}
+	 , date_format(now(), '%Y-%m-%d')
+	 ,'Y'
+	 ,#{providernumber})
+ </insert>
+  <select id="getArticle"  resultType="ArticleOutput" >
+    select a.articlenum
+	       ,a.articlesubject
+			 ,a.articlecontent
+			 ,a.writedate 
+	 from article a
+      where viewyn='Y'
+      and providernumber = #{providernumber}
+      order by 1 desc
+ </select>
+ 
+ <update id="updateArticle"  useGeneratedKeys="true" keyProperty="articlenum" >
+     update article
+	set viewyn = 'N'
+	where articlenum = #{articlenum}
+ </update>
+</mapper>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.api.repository.CodeRepository">
+	
+	<resultMap id="codegroupdetailListResult" type="com.api.billing.model.code.CodeGroupDetail"> 
+		<result property="codeGroupId" column="codegroupid"/>
+		<result property="code" column="code"/> 
+		<result property="codeName" column="codename"/>
+		<result property="codeDescription" column="codedescription"/>
+		<result property="sortingOrder" column="sortingorder"/>
+		<result property="effectStartDateTime" column="effectstartdatetime"/>
+		<result property="effectEndDateTime" column="effectenddatetime"/>
+		<result property="subCodeGroupId" column="subcodegroupid"/>
+	</resultMap>
+
+	<select id="finCodeGroupDetailByCodeGroupId" resultMap="codegroupdetailListResult">
+		SELECT   cgd.code AS code
+		       , cgd.codename AS codename
+		FROM     codegroupdetail cgd
+		WHERE    cgd.codegroupid = #{codeGroupId}
+		AND      DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+		ORDER BY cgd.sortingorder
+	</select>
+	
+</mapper>

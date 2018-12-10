@@ -1,0 +1,2176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.api.repository.InvoiceDetailRepository">
+<insert id="insertPgpaymentlist">
+  INSERT 
+  INTO   pgpaymentlist
+         (
+                tid
+        , providernumber
+        , invoicenumber
+        , invoicedate
+        , connumber
+        , paymentamount
+        , auditid
+                 , auditdatetime
+      )
+  VALUES (
+            #{tid}
+          , #{providernumber}
+          , #{invoicenumber}
+          , #{invoicedate}
+          , #{connumber}
+          , #{paymentamt}
+          , 'BJW'
+          , NOW()
+          )
+ </insert>
+   <insert id="insertCounsellingHistory">
+  INSERT 
+  INTO   counsellinghistory
+         (
+                customernumber
+        , counsellingdate
+        , counsellingtime
+        , category
+        , inboundpath
+        , memo
+        , createuser
+        , auditid
+        , auditdatetime
+        , invoicenumber
+        , invoicedate
+        , connumber
+      )
+  VALUES (
+            #{customernumber}
+          , DATE_FORMAT(NOW(), '%Y%m%d')
+          , DATE_FORMAT(NOW(), '%H%i%s')
+          , 'INVOICE'
+          , 'PHONE'
+          , ifnull(#{memo},'')
+          , 'TEST'
+          , 'TEST'
+          , NOW()
+          , #{invoicenumber}
+          , replace(#{invoicedate},'-','')
+          , #{connumber}
+          )
+ </insert>
+  <select id="getCounsellingTotalCount" resultType="int">
+  <![CDATA[
+       SELECT      
+             count(*)
+      FROM   contract ct,
+       product p,
+       contractproduct cp ,
+      (
+               SELECT    ch.customernumber
+                       , CONCAT(SUBSTR(ch.counsellingdate, 1, 4), '-', SUBSTR(ch.counsellingdate, 5, 2), '-', SUBSTR(ch.counsellingdate, 7, 2)) AS counsellingdate
+                       , CONCAT(SUBSTR(ch.counsellingtime, 1, 2), ':', SUBSTR(ch.counsellingtime, 3, 2), ':', SUBSTR(ch.counsellingtime, 5, 2)) AS counsellingtime
+                       , ch.category
+                       , ch.inboundpath
+                       , ch.memo
+                       , ch.createuser
+                       , ch.invoicenumber
+                       , ch.invoicedate
+                       , ch.connumber
+                FROM     counsellinghistory ch
+                where ch.customernumber = #{customernumber}
+               ) ch
+       left outer join invoice i 
+       on ( ch.invoicedate = i.invoicedate 
+          and ch.customernumber = i.customernumber 
+         and ch.connumber = i.connumber)         
+     where ch.customernumber = ct.customernumber
+     and ct.connumber = cp.connumber
+     and cp.producttype not in ('ETC')
+     and cp.productid = p.productid
+     and cp.producttype = p.producttype
+     and ct.connumber = cp.connumber
+     and ct.connumber = i.connumber
+     and ch.invoicedate between cp.effectstartdatetime and cp.effectenddatetime
+  ]]>
+ </select>
+<select id="getCounsellingData" parameterType="invoiceCounSelling" resultType="invoiceCounSellingResult">
+  <![CDATA[
+         SELECT      
+             ch.customernumber AS customernumber
+           , ch.counsellingdate AS counsellingdate
+           , ch.counsellingtime AS counsellingtime
+           , (select cg.codename from codegroupdetail cg where cg.codegroupid ='CATEGORY' and ch.category = cg.code and cg.effectenddatetime = '99991231') AS category
+           , ch.inboundpath AS inboundpath
+           , ch.memo AS memo
+           , ch.createuser AS createuser
+           , ifnull(p.productname,'') as productname
+           , ifnull(i.invoicenumber,'') as invoicenumber
+           , ifnull(CONCAT(SUBSTR(i.invoicedate, 1, 4), '-', SUBSTR(i.invoicedate, 5, 2), '-', SUBSTR(i.invoicedate, 7, 2)) ,'') as invoicedate
+        FROM   contract ct,
+         product p,
+         contractproduct cp ,
+        (
+                 SELECT    ch.customernumber
+                         , CONCAT(SUBSTR(ch.counsellingdate, 1, 4), '-', SUBSTR(ch.counsellingdate, 5, 2), '-', SUBSTR(ch.counsellingdate, 7, 2)) AS counsellingdate
+                         , CONCAT(SUBSTR(ch.counsellingtime, 1, 2), ':', SUBSTR(ch.counsellingtime, 3, 2), ':', SUBSTR(ch.counsellingtime, 5, 2)) AS counsellingtime
+                         , ch.category
+                         , ch.inboundpath
+                         , ch.memo
+                         , ch.createuser
+                         , ch.invoicenumber
+                         , ch.invoicedate
+                         , ch.connumber
+                  FROM     counsellinghistory ch
+                  where customernumber = #{customernumber}
+                 ) ch
+         left outer join invoice i 
+         on ( ch.invoicedate = i.invoicedate 
+            and ch.customernumber = i.customernumber 
+           and ch.connumber = i.connumber)         
+       where ch.customernumber = ct.customernumber
+       and ct.connumber = cp.connumber
+       and cp.producttype not in ('ETC')
+       and cp.productid = p.productid
+       and cp.producttype = p.producttype
+       and ct.connumber = cp.connumber
+       and ct.connumber = i.connumber
+    and ct.providernumber = p.providernumber
+       and ct.providernumber = i.providernumber
+       and ch.invoicedate between cp.effectstartdatetime and cp.effectenddatetime
+           ORDER BY ch.counsellingdate desc
+             ,ch.counsellingtime desc      
+           LIMIT #{pageStart}, #{perPageNum}
+  ]]>
+ </select>
+  <select id="getInvoiceByDate" resultType="Invoice"  parameterType = "InvoiceDateInput">
+        select 
+    i.invoicenumber
+   ,date_format(i.invoicedate, '%Y-%m-%d') as invoicedate
+   ,c.customername 
+   ,pd.productname
+   ,ifnull(code1.codename,'')   as invoicecycle
+   ,cp.connumber
+   ,ifnull(ifnull(pay.paymentamount,ph.paymentamount),'')  as paymentamount
+   ,ifnull(ifnull(pay.paymentdatetime,ph.paymentdatetime),'') as  paymentdatetime
+   ,i.totalinvoiceamount
+   ,(i.invoiceamount + i.adjustamount) as offerpayamount
+   ,code2.codename               as paymentstatecodename
+   ,ifnull(date_format(ifnull(pay.paymentdatetime,ph.paymentdatetime ), '%Y-%m-%d'),'')  as paymentdate
+   ,i.collectionbalanceamount
+   ,ifnull(code3.codename,'') as errorreason 
+   ,c.email
+   ,c.phonenumber
+   ,c.customernumber
+   from  invoice i
+         left outer join ( paymenthistory as ph  ,  codegroupdetail as code3 )
+                 on (    ph.providernumber = i.providernumber 
+                     and ph.invoicenumber  = i.invoicenumber
+                     and ph.connumber      = i.connumber
+                     and ph.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1             
+                                                      where ph.providernumber = ph1.providernumber 
+                                                        and ph.invoicenumber  = ph1.invoicenumber  
+                                  and ph.connumber      = ph1.connumber
+                                               )
+         and ph.paymenttypecode = 'ERROR'        
+     and ph.errorreasoncode = code3.code
+     and code3.codegroupid = 'errorreasoncode'     
+                     )
+       left outer join paymenthistory as pay
+                 on (pay.providernumber    = i.providernumber 
+                     and pay.invoicenumber = i.invoicenumber
+                     and pay.connumber      = i.connumber
+                     and pay.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1 
+                                                      where pay.providernumber = ph1.providernumber 
+                                                        and pay.invoicenumber  = ph1.invoicenumber  
+                                                        and pay.connumber      = ph1.connumber
+                                   )
+                      and pay.paymenttypecode = 'PAYMENT'
+                      and pay.refundyn = 'N'   
+                     )
+        ,customer c
+        ,contract crt
+        left outer join codegroupdetail as code1
+            on  (code1.codegroupid = 'invoicecycle'
+                 and crt.invoicecycle = code1.code)
+        ,product  pd
+        ,contractproduct cp
+        ,codegroupdetail code2
+   where i.providernumber = #{providernumber}
+   and   i.invoicedate between replace(#{fromDate},'-','')  and replace(#{toDate},'-','') 
+   and   i.customernumber = c.customernumber
+   and   i.connumber = cp.connumber
+   and   crt.connumber = cp.connumber
+   and   cp.productid  = pd.productid
+   and   i.paymentstatecode = code2.code
+   and   code2.codegroupid = 'paymentstatecode'
+   and   i.providernumber = c.providernumber
+   and   i.providernumber = crt.providernumber
+   and   i.providernumber = pd.providernumber
+   and   ( #{paymenttypeyn} = 'Z' and 1=1 
+         or #{paymenttypeyn} = 'Y' and i.collectionbalanceamount = 0 
+         or #{paymenttypeyn} = 'N' and i.collectionbalanceamount <![CDATA[>]]> 0 )
+ order by 2 desc,1
+ LIMIT #{pageStart}, #{perPageNum}
+    </select>
+    <select id="getInvoiceTotCount" resultType="int"  >
+     select 
+    count(*)
+   from  invoice i
+         left outer join ( paymenthistory as ph  ,  codegroupdetail as code3 )
+                 on (    ph.providernumber = i.providernumber 
+                     and ph.invoicenumber  = i.invoicenumber
+                     and ph.connumber      = i.connumber
+                     and ph.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1             
+                                                      where ph.providernumber = ph1.providernumber 
+                                                        and ph.invoicenumber  = ph1.invoicenumber  
+                                  and ph.connumber      = ph1.connumber
+                                               )
+         and ph.paymenttypecode = 'ERROR'        
+     and ph.errorreasoncode = code3.code
+     and code3.codegroupid = 'errorreasoncode'     
+                     )
+       left outer join paymenthistory as pay
+                 on (pay.providernumber    = i.providernumber 
+                     and pay.invoicenumber = i.invoicenumber
+                     and pay.connumber      = i.connumber
+                     and pay.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1 
+                                                      where pay.providernumber = ph1.providernumber 
+                                                        and pay.invoicenumber  = ph1.invoicenumber  
+                                                        and pay.connumber      = ph1.connumber
+                                   )
+                      and pay.paymenttypecode = 'PAYMENT'
+                      and pay.refundyn = 'N'   
+                     )
+        ,customer c
+        ,contract crt
+         left outer join codegroupdetail as code1
+            on  (code1.codegroupid = 'invoicecycle'
+                 and crt.invoicecycle = code1.code)
+        ,product  pd
+        ,contractproduct cp
+        ,codegroupdetail code2
+   where i.providernumber = #{providernumber}
+   and   i.invoicedate between replace(#{fromDate},'-','')  and replace(#{toDate},'-','') 
+   and   i.customernumber = c.customernumber
+   and   i.connumber = cp.connumber
+   and   crt.connumber = cp.connumber
+   and   cp.productid  = pd.productid
+   and   i.paymentstatecode = code2.code
+   and   i.providernumber = c.providernumber
+   and   i.providernumber = crt.providernumber
+   and   i.providernumber = pd.providernumber
+   and   code2.codegroupid = 'paymentstatecode'
+   and   ( #{paymenttypeyn} = 'Z' and 1=1 
+         or #{paymenttypeyn} = 'Y' and i.collectionbalanceamount = 0 
+         or #{paymenttypeyn} = 'N' and i.collectionbalanceamount <![CDATA[>]]> 0 )
+    </select>
+    
+ <select id="getInvoiceByName" resultType="Invoice"  parameterType = "InvoiceNameInput">
+   select 
+   i.invoicenumber
+  ,case when ( i.prepayyn = 'N') then '정기결제' else '일괄결제' end as paymenttype
+  ,date_format(i.invoicedate, '%Y-%m-%d') as invoicedate
+  ,c.customername 
+  ,pd.productname
+  ,ifnull(code1.codename,'')  as invoicecycle
+  ,cp.connumber
+  ,ifnull(ifnull(pay.paymentamount,ph.paymentamount),'')  as paymentamount
+  ,ifnull(ifnull(pay.paymentdatetime,ph.paymentdatetime),'') as  paymentdatetime
+  ,i.totalinvoiceamount
+  ,code2.codename               as paymentstatecodename
+  ,ifnull(date_format(ifnull(pay.paymentdatetime,ph.paymentdatetime ), '%Y-%m-%d'),'')  as paymentdate
+  ,i.collectionbalanceamount
+  ,ifnull(code3.codename,'') as errorreason 
+  ,i.adjustamount
+  from  invoice i
+        left outer join ( paymenthistory as ph  ,  codegroupdetail as code3 )
+                on (    ph.providernumber = i.providernumber 
+                    and ph.invoicenumber  = i.invoicenumber
+                    and ph.connumber      = i.connumber
+                    and ph.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1             
+                                                     where ph.providernumber = ph1.providernumber 
+                                                       and ph.invoicenumber  = ph1.invoicenumber  
+                                 and ph.connumber      = ph1.connumber
+                                              )
+        and ph.paymenttypecode = 'ERROR'        
+        and ph.errorreasoncode = code3.code
+        and code3.codegroupid = 'errorreasoncode'     
+                    )
+      left outer join paymenthistory as pay
+                on (pay.providernumber    = i.providernumber 
+                    and pay.invoicenumber = i.invoicenumber
+                    and pay.connumber      = i.connumber
+                    and pay.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1 
+                                                     where pay.providernumber = ph1.providernumber 
+                                                       and pay.invoicenumber  = ph1.invoicenumber  
+                                                       and pay.connumber      = ph1.connumber 
+                                  )
+                     and pay.paymenttypecode = 'PAYMENT'
+                     and pay.refundyn = 'N'              
+                    )
+       ,customer c
+       ,contract crt
+       left outer join codegroupdetail as code1
+            on  (code1.codegroupid = 'invoicecycle'
+                 and crt.invoicecycle = code1.code)
+       ,product  pd
+       ,contractproduct cp
+       ,codegroupdetail code2
+  where i.providernumber = #{providernumber}
+  and   c.customername like concat('%',#{customerName},'%')
+  and   c.phonenumber like concat('%',#{phoneNumber},'%')
+  and   i.customernumber = c.customernumber
+  and   i.connumber = cp.connumber
+  and   crt.connumber = cp.connumber
+  and   cp.productid  = pd.productid  
+  and   i.paymentstatecode = code2.code
+  and   i.providernumber = c.providernumber
+  and   i.providernumber = crt.providernumber
+  and   i.providernumber = pd.providernumber
+  and   ((crt.recurringinvoiceyn = 'Y') or (crt.recurringinvoiceyn = 'N' and i.prepayyn = 'Y'))
+  and   code2.codegroupid = 'paymentstatecode'
+  and   ( #{paymenttypeyn} = 'Z' and 1=1 
+         or #{paymenttypeyn} = 'Y' and i.collectionbalanceamount = 0 
+         or #{paymenttypeyn} = 'N' and i.collectionbalanceamount <![CDATA[>]]> 0 )
+  order by 2 desc
+  LIMIT #{pageStart}, #{perPageNum}
+    </select>
+
+    
+     <select id="getInvoiceNameTotCount" resultType="int"  >
+    select 
+    count(*)
+   from  invoice i
+         left outer join ( paymenthistory as ph  ,  codegroupdetail as code3 )
+                 on (    ph.providernumber = i.providernumber 
+                     and ph.invoicenumber  = i.invoicenumber
+                     and ph.connumber      = i.connumber
+                     and ph.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1             
+                                                      where ph.providernumber = ph1.providernumber 
+                                                        and ph.invoicenumber  = ph1.invoicenumber  
+                                  and ph.connumber      = ph1.connumber
+                                               )
+         and ph.paymenttypecode = 'ERROR'        
+     and ph.errorreasoncode = code3.code
+     and code3.codegroupid = 'errorreasoncode'     
+                     )
+       left outer join paymenthistory as pay
+                 on (pay.providernumber    = i.providernumber 
+                     and pay.invoicenumber = i.invoicenumber
+                     and pay.connumber      = i.connumber
+                     and pay.paymentdatetime = (select max(ph1.paymentdatetime) from paymenthistory ph1 
+                                                      where pay.providernumber = ph1.providernumber 
+                                                        and pay.invoicenumber  = ph1.invoicenumber  
+                                                        and pay.connumber      = ph1.connumber
+                                   )
+                      and pay.paymenttypecode = 'PAYMENT'
+                      and pay.refundyn = 'N'   
+                     )
+        ,customer c
+        ,contract crt
+         left outer join codegroupdetail as code1
+            on  (code1.codegroupid = 'invoicecycle'
+                 and crt.invoicecycle = code1.code)
+        ,product  pd
+        ,contractproduct cp
+        ,codegroupdetail code2
+   where i.providernumber = #{providernumber}
+   and   c.customername like concat('%',#{customerName},'%')
+   and   c.phonenumber like concat('%',#{phoneNumber},'%')
+   and   i.customernumber = c.customernumber
+   and   i.connumber = cp.connumber
+   and   crt.connumber = cp.connumber
+   and   cp.productid  = pd.productid  
+   and   i.paymentstatecode = code2.code
+   and   i.providernumber = c.providernumber
+   and   i.providernumber = crt.providernumber
+   and   i.providernumber = pd.providernumber
+   and   ((crt.recurringinvoiceyn = 'Y') or (crt.recurringinvoiceyn = 'N' and i.prepayyn = 'Y'))
+   and   code2.codegroupid = 'paymentstatecode'
+   and   ( #{paymenttypeyn} = 'Z' and 1=1 
+     or #{paymenttypeyn} = 'Y' and i.collectionbalanceamount = 0 
+     or #{paymenttypeyn} = 'N' and i.collectionbalanceamount <![CDATA[>]]> 0 )
+   order by 1
+    </select>
+    
+    <select id="getInvoiceDetail" resultType="InvoiceDetail">
+select 
+ v0.invoiceNumber as invoiceNumber
+ ,v0.invoiceClassificationCode as invoiceClassificationCode
+ ,v0.revenueItemCode as revenueItemCode
+ ,sum(v0.inv_amt) as invoiceItemAmount
+ ,sum(v0.adj_amt) as adjustamt
+ ,sum(v0.paymentAmount) as paymentAmount
+ ,sum(v0.collectionBalanceAmount) as collectionBalanceAmount
+ ,v0.taxYn
+ ,v0.ordernum
+from ( 
+   select
+    id.invoicenumber as invoiceNumber
+   ,gubun_list.gubun as invoiceClassificationCode
+   ,gubun_list.revenueitemname as revenueItemCode
+   ,id.invoiceclassificationcode as gubun
+   ,case when ( id.invoiceclassificationcode = '000') then sum(id.invoiceItemamount) else 0 end as inv_amt
+   ,case when ( id.invoiceclassificationcode = '006') then sum(id.invoiceItemamount) else 0 end as adj_amt
+   ,case when (i.collectioncloseyn = 'N') then 0 else id.invoiceItemamount end as paymentAmount
+   ,id.collectionbalanceamount as collectionBalanceAmount
+   ,gubun_list.taxYn
+   ,gubun_list.ordernum
+   from  
+    invoicedetail id
+    ,invoice i 
+    ,(select 
+     case when (p.producttype = 'ETC') then 4 else 1 end as ordernum, 
+     case when (p.producttype = 'ETC') then '부가세' else '기본료' end as gubun, 
+     p.productid as revenueitemcode, 
+     p.productname as revenueitemname, 
+     p.providernumber as providernumber,
+     ifnull(p.taxobjectyn, 'N') as taxYn,
+     p.subscribestartdatetime as subscribestartdatetime, 
+     p.subscribeenddatetime as subscribeenddatetime
+     from product p
+  where p.providernumber = #{providernumber}
+     union all
+     select case when (d.discounttype = 'ETC') then 5 else 3 end as ordernum, 
+     case when (d.discounttype = 'ETC') then '부가세' else '할인' end as gubun, 
+     d.discountid as revenueitemcode, 
+     d.discountname as revenueitemname, 
+     d.providernumber as providernumber,
+     'N' as taxYn,
+     d.subscribestartdatetime as subscribestartdatetime, 
+     d.subscribeenddatetime as subscribeenddatetime
+     from discount d
+  where d.providernumber = #{providernumber}
+     union all
+     select 2 as ordernum, 
+     '일회성' as gubun, 
+     otf.onetimefeeid as revenueitemcode, 
+     otf.onetimefeename as revenueitemname, 
+     otf.providernumber as providernumber,
+     ifnull(otf.taxobjectyn, 'N') as taxYn,
+     otf.subscribestartdatetime as subscribestartdatetime, 
+     otf.subscribeenddatetime as subscribeenddatetime
+     from onetimefee otf
+  where otf.providernumber = #{providernumber}
+     ) gubun_list 
+   where id.invoicedate = replace(#{InvoiceDate},'-','')
+   and  id.invoicenumber = #{InvoiceNumber}
+   and  id.connumber = #{conNumber}
+   and  id.revenueitemcode = gubun_list.revenueitemcode
+   and  i.providernumber = id.providernumber
+   and  i.invoicenumber = id.invoicenumber
+   and  i.invoicedate = id.invoicedate
+   and  i.connumber = id.connumber
+   and  id.providernumber = #{providernumber}
+   and  id.providernumber = gubun_list.providernumber 
+   and  id.providernumber = i.providernumber
+   and  id.invoicedate between gubun_list.subscribestartdatetime and gubun_list.subscribeenddatetime
+   group by   
+    id.invoicenumber 
+   ,gubun_list.gubun 
+   ,gubun_list.revenueitemname  
+   ,id.collectionbalanceamount 
+   ,gubun_list.ordernum
+   ,id.invoiceclassificationcode
+   ,gubun_list.taxYn) v0
+group by  v0.invoiceNumber
+ ,v0.invoiceClassificationCode
+ ,v0.revenueItemCode
+ ,v0.taxYn
+ ,v0.ordernum
+order by v0.ordernum
+ </select>
+    
+    <select id="getInvoiceDetailCustomerInfo" resultType="InvoiceDetailCustomerInfo">
+    select   cu.customername
+        , cu.phonenumber
+        , p.productname
+        , ifnull(p.productdescription,'') as productdescription
+        , date_format(i.invoicedate, '%Y-%m-%d') as invoicedate
+        , cp.packageid
+        , p.productid
+        , c.connumber
+        , cu.email
+        , ifnull(date_format(substr((select paymentdatetime   
+        from paymenthistory ph 
+      where ph.providernumber = cu.providernumber 
+      and i.invoicenumber = ph.invoicenumber
+      and ph.paymentdatetime = (select max(paymentdatetime) from paymenthistory ph1 
+                                                      where ph.providernumber = ph1.providernumber 
+                      and ph.invoicenumber = ph1.invoicenumber
+                       )
+      and ph.paymenttypecode = 'PAYMENT'                 
+      ) ,1,8), '%Y-%m-%d') ,'') paymentdate
+  from contract  c
+     , customer cu
+     , contractproduct cp
+   , product p
+   , invoice i
+  where cu.providernumber = #{providernumber}
+  and c.providernumber = cu.providernumber
+  and c.customernumber = cu.customernumber
+  and c.providernumber = i.providernumber
+  and c.connumber = cp.connumber
+  and c.customernumber =i.customernumber
+  and c.connumber = i.connumber
+  and i.invoicenumber =  #{InvoiceNumber}  
+  and i.invoicedate = replace(#{InvoiceDate},'-','')
+  and c.providernumber =  p.providernumber
+  and cp.productid = p.productid
+  and (cp.producttype in ('NORMAL','COUPONCOUNT','COUPONPRICE') or p.packagepricereferenceyn ='N') 
+  union all
+  select   cu.customername
+         , cu.phonenumber
+         , ifnull((select p1.productname from product p1 where p1.productid = pp.mainproductid),'') as productname
+         , ifnull((select p2.productdescription from product p2 where p2.productid = pp.mainproductid),'') as productdescription
+         , date_format(i.invoicedate, '%Y-%m-%d') as invoicedate
+         , cp.packageid
+         , p.productid
+         , c.connumber
+         , cu.email
+         , ifnull(date_format(substr((select paymentdatetime   
+               from paymenthistory ph 
+             where ph.providernumber = cu.providernumber 
+             and i.invoicenumber = ph.invoicenumber
+             and ph.paymentdatetime = (select max(paymentdatetime) from paymenthistory ph1 
+                                                             where ph.providernumber = ph1.providernumber 
+                             and ph.invoicenumber = ph1.invoicenumber
+                              )
+             and ph.paymenttypecode = 'PAYMENT'                 
+             ) ,1,8) ,'%Y-%m-%d'),'') paydate
+  from contract  c
+     , customer cu
+     , contractproduct cp
+   , productpackage pp
+   , product p
+   , invoice i
+  where cu.providernumber = #{providernumber}
+  and c.providernumber = cu.providernumber
+  and c.customernumber = cu.customernumber
+  and c.providernumber = i.providernumber
+  and c.connumber = cp.connumber
+  and cp.packageid = pp.packageid
+  and p.productid = pp.compositionproductid
+  and c.customernumber =i.customernumber
+  and c.connumber = i.connumber
+  and i.invoicenumber =  #{InvoiceNumber}    
+  and i.invoicedate = replace(#{InvoiceDate},'-','')
+  and cp.producttype = 'PACKAGE'
+  and cp.packagepricereferenceyn ='Y'
+  and c.providernumber = pp.providernumber
+  and c.providernumber = p.providernumber
+  limit 1
+    </select>
+    
+    <insert id="setInvoiceCalculation"  parameterType = "InvoiceCalculationInput" useGeneratedKeys="true" keyProperty="connumber" >
+     insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime) 
+select fee.providernumber, null as invoicenumber, fee.connumber, paymentinformationnumber, fee.customernumber, 
+fee.productid as revenueitemcode, '000' as invoiceclassificationcode, fee.nextinvoicedatetime as invoicedate, fee.invoicestartdate, fee.invoiceenddate, fee.totinvoiceday,
+fee.invoiceaplyday, fee.invoiceamount as invoiceamount, fee.invoiceamount as collectionbalanceamount, 'BJW' as auditid, now() as auditdatetime
+from (
+ select  '월정액' as cl, 
+   inv_obj.*
+ , cp.productid
+ , cp.producttype
+ , cp.packageid
+ , cp.packagepricereferenceyn
+ , cp.packagevarietyyn
+ , cp.quantity
+ , cp.effectstartdatetime
+ , cp.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cp.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cp.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cp.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cp.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ case when (inv_obj.invoicecycle = 'MONTH') 
+ then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes)  /* invoicecycle = "month" and deliverycycle = "month" */
+                 else (cp.quantity*inv_obj.deliverytimes * 4) end) /* invoicecycle = "month" and deliverycycle = "week" */
+ else (cp.quantity*inv_obj.deliverytimes) end /* invoicecycle = "week" and deliverycycle = "week" */ 
+ as totquantity, /* 계산할 총 수량 */ 
+ p.productname, p.priceamount, p.taxobjectyn, 
+ (p.priceamount*(case when (inv_obj.invoicecycle = 'MONTH') 
+      then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes)  /* invoicecycle = "month" and deliverycycle = "month" */
+                 else (cp.quantity*inv_obj.deliverytimes * 4) end) /* invoicecycle = "month" and deliverycycle = "week" */
+      else (cp.quantity*inv_obj.deliverytimes) end)) as invoiceamount
+ from (  
+    /* 정기결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and c.recurringinvoiceyn = 'Y'
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.providernumber = #{providernumber} /* 20180919 */
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /* 청구대상 중복대상 제외처리 20180919 */
+  union all       /* 일괄결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c, invoice i
+    where c.contractstate = 'ACTIVATION'
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.connumber = i.connumber
+    and date_format(c.subscribedatetime, "%Y%m%d") = i.invoicedate
+    and i.collectioncloseyn = 'Y'
+    and i.prepayyn  = 'Y'  
+    and c.recurringinvoiceyn = 'N'
+    and i.providernumber = c.providernumber /* 20180919 */
+    and i.providernumber = #{providernumber} /* 20180919 */
+    and i.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /* 청구대상 중복대상 제외처리  20180919 */
+ ) inv_obj, contractproduct cp, product p
+ where inv_obj.connumber = cp.connumber
+ and inv_obj.invoicestartdate between cp.effectstartdatetime and cp.effectenddatetime  /* 유효계약상품 (이전청구일자 ~ 청구작업일자) date_formate(now(), "%Y%m%d")*/
+ and cp.producttype = 'NORMAL'
+ and cp.productid = p.productid
+ and cp.producttype = p.producttype 
+ and cp.packageid is null
+ and cp.packagepricereferenceyn is null
+ and cp.packagevarietyyn is null
+ and p.packageyn = 'N'
+ and inv_obj.providernumber = p.providernumber /* 20180919 */ 
+ union all 
+ select /* package 상품 월정액 계산(고정금액 package) */ '고정금액package' as cl, 
+ inv_obj.*, cp.productid, cp.producttype, cp.packageid, cp.packagepricereferenceyn, cp.packagevarietyyn, cp.quantity, cp.effectstartdatetime, cp.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cp.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cp.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cp.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cp.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ case when (inv_obj.invoicecycle = 'MONTH') 
+ then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes)  /* invoicecycle = "month" and deliverycycle = "month" */
+                 else (cp.quantity*inv_obj.deliverytimes * 4) end) /* invoicecycle = "month" and deliverycycle = "week" */
+ else (cp.quantity*inv_obj.deliverytimes) end /* invoicecycle = "week" and deliverycycle = "week" */ 
+ as totquantity, /* 계산할 총 수량 */ 
+ p.productname, p.priceamount, p.taxobjectyn, 
+ (p.priceamount*(case when (inv_obj.invoicecycle = 'MONTH') 
+      then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes)  /* invoicecycle = "month" and deliverycycle = "month" */
+                 else (cp.quantity*inv_obj.deliverytimes * 4) end) /* invoicecycle = "month" and deliverycycle = "week" */
+      else (cp.quantity*inv_obj.deliverytimes) end)) as invoiceamount
+ from (  
+ /* 정기결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.recurringinvoiceyn = 'Y'
+    and c.providernumber = #{providernumber} /* 20180919 */
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /*20180919*/ 
+  union all       /* 일괄결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c, invoice i
+    where c.contractstate = 'ACTIVATION'
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.connumber = i.connumber
+    and date_format(c.subscribedatetime, "%Y%m%d") = i.invoicedate
+    and i.collectioncloseyn = 'Y'
+    and i.prepayyn  = 'Y'  
+    and c.recurringinvoiceyn = 'N'
+    and i.providernumber = c.providernumber /* 20180919 */
+    and i.providernumber = #{providernumber} /* 20180919 */
+    and i.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /* 청구대상 중복대상 제외처리  20180919 */ 
+   /* 청구대상 중복대상 제외처리 */ 
+ ) inv_obj, contractproduct cp, product p
+ where inv_obj.connumber = cp.connumber
+ and inv_obj.invoicestartdate between cp.effectstartdatetime and cp.effectenddatetime  /* 유효계약상품 (이전청구일자 ~ 청구작업일자) date_formate(now(), "%Y%m%d")*/
+ and cp.producttype = 'PACKAGE'
+ and cp.productid = p.productid
+ and cp.producttype = p.producttype 
+ and cp.packageid is not null
+ and p.packageyn = 'Y'
+ and p.packagepricereferenceyn = 'N'
+ and inv_obj.providernumber = p.providernumber /* 20180919 */ 
+ union all
+ select /* package 상품 월정액 계산(변동금액 package) */ '변동금액package' as cl, 
+ inv_obj.*, pkp.productid, cp.producttype, cp.packageid, cp.packagepricereferenceyn, cp.packagevarietyyn, cp.quantity, cp.effectstartdatetime, cp.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cp.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cp.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cp.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cp.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ case when (inv_obj.invoicecycle = 'MONTH') 
+ then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes)  /* invoicecycle = "month" and deliverycycle = "month" */
+                 else (cp.quantity*inv_obj.deliverytimes * 4) end) /* invoicecycle = "month" and deliverycycle = "week" */
+ else (cp.quantity*inv_obj.deliverytimes) end /* invoicecycle = "week" and deliverycycle = "week" */ 
+ as totquantity, /* 계산할 총 수량 */ 
+ pkp.productname, pkp.priceamount, pkp.taxobjectyn, 
+ (pkp.priceamount*(case when (inv_obj.invoicecycle = 'MONTH') 
+      then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes)  /* invoicecycle = "month" and deliverycycle = "month" */
+                 else (cp.quantity*inv_obj.deliverytimes * 4) end) /* invoicecycle = "month" and deliverycycle = "week" */
+      else (cp.quantity*inv_obj.deliverytimes) end)) as invoiceamount
+ from (  
+  /* 정기결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and c.recurringinvoiceyn = 'Y'
+    and c.providernumber = #{providernumber} /* 20180919 */
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /* 20180919*/
+  union all       /* 일괄결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c, invoice i
+    where c.contractstate = 'ACTIVATION'
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.connumber = i.connumber
+    and date_format(c.subscribedatetime, "%Y%m%d") = i.invoicedate
+    and i.collectioncloseyn = 'Y'
+    and i.prepayyn  = 'Y'  
+    and c.recurringinvoiceyn = 'N'
+    and i.providernumber = c.providernumber /* 20180919 */
+    and i.providernumber = #{providernumber} /* 20180919 */
+    and i.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /* 청구대상 중복대상 제외처리 20180919 */
+   /* 청구대상 중복대상 제외처리 */ 
+ ) inv_obj, contractproduct cp, product p, productpackage pp, product pkp
+ where inv_obj.connumber = cp.connumber
+ and inv_obj.invoicestartdate between cp.effectstartdatetime and cp.effectenddatetime  /* 유효계약상품 (이전청구일자 ~ 청구작업일자) date_formate(now(), "%Y%m%d")*/
+ and cp.producttype = 'PACKAGE'
+ and cp.productid = p.productid
+ and cp.producttype = p.producttype 
+ and cp.packageid = pp.packageid
+ and cp.packagepricereferenceyn = 'Y'
+ and p.packagepricereferenceyn = 'Y'
+ and p.packageyn = 'Y'
+ and p.productid = pp.mainproductid
+ and inv_obj.invoicestartdate between pp.effectstartdatetime and pp.effectenddatetime
+ and pp.compositionproductid = pkp.productid
+ and inv_obj.invoicestartdate between pkp.subscribestartdatetime and pkp.subscribeenddatetime
+ and pkp.producttype = 'NORMAL' /* 패키지 상품 내 compositionproudct의 producttype은 무조건 'NORMAL' */
+ and inv_obj.providernumber = p.providernumber /* 20180919 */ 
+ and inv_obj.providernumber = pp.providernumber /* 20180919 */ 
+ and inv_obj.providernumber = pkp.providernumber /* 20180919 */
+ union all 
+ select /* 일회성 계산 */ '일회성' as cl, 
+ inv_obj.*, cotf.onetimefeeid as productid, otf.onetimefeetype as producttype, null as packageid, null as packagepricereferenceyn, null as packagevarietyyn, 
+ cotf.quantity, cotf.effectstartdatetime,  cotf.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cotf.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cotf.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cotf.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]> 0 ) then str_to_date(cotf.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ (case when (otf.onetimefeetype = 'DELIVERY') /* 배송비 일회성 계산의 경우, contract에서 delivery 횟수만큼 계산 , 나머지 일회성 요금은 1 청구작업 1요금 ) */
+ then (case when (inv_obj.invoicecycle = 'MONTH')
+      then (case when inv_obj.deliverycycle = 'MONTH' 
+         then (cotf.quantity*inv_obj.deliverytimes) /* invoicecycle = "month" and deliverycycle = "month" */
+     else (cotf.quantity*inv_obj.deliverytimes * 4) /* invoicecycle = "month" and deliverycycle = "week" */ end )
+   else (cotf.quantity*inv_obj.deliverytimes) end) /* invoicecycle = "week" and deliverycycle = "week" */ 
+ else (1) end ) as totquantity, /* 총 양, 배송비 일회성 계산의 경우, 1 청구 주기당 총 배송횟수 , 배송비 외의 일회성 요금은 무조건 quantity 1 */ 
+ otf.onetimefeename, otf.priceamount, otf.taxobjectyn, 
+ (case when (otf.onetimefeetype = 'DELIVERY') /* 총 청구 금액, 배송비 일회성 계산의 경우, contract에서 delivery 횟수만큼 계산 , 나머지 일회성 요금은 1 청구작업 1요금 ) */
+ then (otf.priceamount *
+  (case when (inv_obj.invoicecycle = 'MONTH')
+   then (case when inv_obj.deliverycycle = 'MONTH' 
+         then (cotf.quantity*inv_obj.deliverytimes) /* invoicecycle = "month" and deliverycycle = "month" */
+     else (cotf.quantity*inv_obj.deliverytimes * 4) /* invoicecycle = "month" and deliverycycle = "week" */ end )
+   else (cotf.quantity*inv_obj.deliverytimes) end) /* invoicecycle = "week" and deliverycycle = "week" */ )
+  else (otf.priceamount*1) end ) as invoiceamount    
+ from (  
+  /* 정기결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and c.recurringinvoiceyn = 'Y'
+    and c.providernumber = #{providernumber} /* 20180919 */
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /*20180919*/
+  union all       /* 일괄결제 대상 */
+  select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, c.nextinvoicedatetime,
+           date_format(c.nextinvoicedatetime, "%Y%m%d") as invoicestartdate, 
+           case when (c.invoicecycle = 'MONTH') then date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d") else date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d") end as invoiceenddate,
+           case when (c.invoicecycle  = 'MONTH') then datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 month), "%Y%m%d"), c.nextinvoicedatetime) 
+                                                else datediff(date_format(date_add(c.nextinvoicedatetime, interval +1 week), "%Y%m%d"), c.nextinvoicedatetime) end as totinvoiceday
+    from contract c, invoice i
+    where c.contractstate = 'ACTIVATION'
+    and c.nextinvoicedatetime = replace(#{calfromDate},'-','') /* 청구대상 선정 ('20180705' : 청구작업일자) date_formate(now(), "%Y%m%d")*/ 
+    and c.connumber = i.connumber
+    and date_format(c.subscribedatetime, "%Y%m%d") = i.invoicedate
+    and i.collectioncloseyn = 'Y'
+    and i.prepayyn  = 'Y'  
+    and c.recurringinvoiceyn = 'N'
+    and i.providernumber = c.providernumber /* 20180919 */
+    and i.providernumber = #{providernumber} /* 20180919 */
+    and i.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = replace(#{calfromDate},'-','') and pre_i.prepayyn = 'N' and pre_i.providernumber = #{providernumber} ) /* 청구대상 중복대상 제외처리 20180919 */
+ ) inv_obj, contractonetimefee cotf, onetimefee otf
+ where inv_obj.connumber = cotf.connumber
+ and inv_obj.invoicestartdate between cotf.effectstartdatetime and cotf.effectenddatetime 
+ and cotf.onetimefeeid = otf.onetimefeeid
+ and inv_obj.invoicestartdate between otf.subscribestartdatetime and otf.subscribeenddatetime
+ and inv_obj.providernumber = otf.providernumber /* 20180919 */
+) fee
+    </insert>
+    
+   <insert id="setInvoiceCalculationDiscountRate"  parameterType = "InvoiceCalculationInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime)
+select dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, /*일반 할인 ver 2 ( rate, amount 두개 다 있을 경우 rate 먼저 할인 타도록 설정 - rate) => 할인 금액이랑 tax 부과 매출항목별 부가세 계산 : 정률할인 공급가액 할인금액 계산 */
+       dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+     dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+     dis_cal.invoiceaplyday, sum(dis_cal.invoiceamount) as invoiceamount, sum(collectionbalanceamount) as collectionbalanceamount, dis_cal.auditid, dis_cal.auditdatetime 
+from (
+ select inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber, /*일반 할인 ver 2 ( rate, amount 두개 다 있을 경우 rate 먼저 할인 타도록 설정 - rate) => 할인 금액이랑 tax 부과 매출항목별 부가세 계산 : 정률할인 공급가액 할인금액 계산 */
+        inv.customernumber, cd.discountid as revenueitemcode , '000' as invoiceclassificationcode,
+      inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+     datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+           (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else  str_to_date(cd.effectstartdatetime, "%Y%m%d")end)) as invoiceaplyday,
+     sum(truncate((inv.invoiceamount*cd.discountvalue/100),0)*(-1)) as invoiceamount, 
+     sum(truncate((inv.invoiceamount*cd.discountvalue/100),0)*(-1)) as collectionbalanceamount, 
+     'BJW' as auditid, now() as auditdatetime 
+ from (
+     select ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, ic.revenueitemcode,
+     ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, ic.invoiceamount,  p.taxobjectyn
+    from invoicecalculation ic, product p
+    where ic.invoicedate = replace(#{calfromDate},'-','')
+ and ic.providernumber = #{providernumber} /* 20180919 */
+    and ic.invoiceclassificationcode = '000'
+    and ic.revenueitemcode not in ( select onetimefeeid from onetimefee )
+    and ic.collectionbalanceamount != 0
+    and ic.revenueitemcode = p.productid
+    and ic.invoicenumber is null
+      and ic.providernumber = p.providernumber
+      and str_to_date(p.subscribeenddatetime, "%Y%m%d") <![CDATA[>=]]> str_to_date(ic.invoicestartdate, "%Y%m%d")
+      and str_to_date(p.subscribestartdatetime, "%Y%m%d") <![CDATA[<=]]> str_to_date(ic.invoiceenddate, "%Y%m%d")   
+    ) inv, discount d, contractdiscount cd
+ where inv.connumber = cd.connumber
+ and str_to_date(cd.effectenddatetime, "%Y%m%d") <![CDATA[>=]]> str_to_date(inv.invoicestartdate, "%Y%m%d")
+ and str_to_date(cd.effectstartdatetime, "%Y%m%d") <![CDATA[<=]]> str_to_date(inv.invoiceenddate, "%Y%m%d")
+ and cd.discounttype = 'RATE'
+ and cd.discountid = d.discountid
+ and cd.discounttype = d.discounttype
+ and inv.providernumber = d.providernumber
+ group by inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber,
+        inv.customernumber, cd.discountid , '000',
+      inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+      datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+           (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[<=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else  str_to_date(cd.effectstartdatetime, "%Y%m%d")end)) ,     
+     'BJW', now() 
+ ) dis_cal
+group by dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+         dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+       dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+       dis_cal.invoiceaplyday, dis_cal.auditid, dis_cal.auditdatetime
+   </insert> 
+   
+      <insert id="setInvoiceCalculationDiscountAmount"  parameterType = "InvoiceCalculationInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime)
+select dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, /*일반 할인 ver 2 ( rate, amount 두개 다 있을 경우 rate 먼저 할인 타도록 설정 - rate) => 할인 금액이랑 tax 부과 매출항목별 부가세 계산 : 정률할인 공급가액 할인금액 계산 */
+       dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+     dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+     dis_cal.invoiceaplyday, sum(dis_cal.invoiceamount) as invoiceamount, sum(collectionbalanceamount) as collectionbalanceamount, dis_cal.auditid, dis_cal.auditdatetime 
+from (
+select inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber, /*일반 할인 ( rate, amount 두개 다 있을 경우 rate 먼저 할인 타도록 설정 - amount) : 정액할인 공급가액 할인금액 계산 */
+       inv.customernumber, cd.discountid as revenueitemcode , '000' as invoiceclassificationcode,
+     inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+    datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+          (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else str_to_date(cd.effectstartdatetime, "%Y%m%d") end)) as invoiceaplyday,
+    (case when (inv.sum_inv_amt >= cd.discountvalue) then (cd.discountvalue*(-1)) else (inv.sum_inv_amt*(-1)) end ) as invoiceamount, 
+    (case when (inv.sum_inv_amt >= cd.discountvalue) then (cd.discountvalue*(-1)) else (inv.sum_inv_amt*(-1)) end ) as collectionbalanceamount, 
+    'BJW' as auditid, now() as auditdatetime
+from (
+    select ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+    ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, 
+   sum(ic.invoiceamount) as sum_inv_amt
+   from invoicecalculation ic
+   where ic.invoicedate = replace(#{calfromDate},'-','')
+   and ic.providernumber = #{providernumber}  /* 20180919 */
+   and ic.invoiceclassificationcode = '000'
+   and ic.revenueitemcode not in ( select onetimefeeid from onetimefee )
+   and ic.collectionbalanceamount != 0
+   and ic.invoicenumber is null
+   group by ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+   ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday ) inv, contractdiscount cd
+where inv.connumber = cd.connumber
+and str_to_date(cd.effectenddatetime, "%Y%m%d") <![CDATA[>=]]> str_to_date(inv.invoicestartdate, "%Y%m%d")
+and str_to_date(cd.effectstartdatetime, "%Y%m%d") <![CDATA[<=]]> str_to_date(inv.invoiceenddate, "%Y%m%d")
+and cd.discounttype = 'AMOUNT'
+ group by inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber,
+        inv.customernumber, cd.discountid , '000',
+      inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+      datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+           (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[<=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else  str_to_date(cd.effectstartdatetime, "%Y%m%d")end)) ,     
+     'BJW', now() 
+)dis_cal
+group by dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+         dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+       dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+       dis_cal.invoiceaplyday, dis_cal.auditid, dis_cal.auditdatetime
+   </insert>
+   
+      <insert id="setInvoiceCalculationDiscountOneTimeFee"  parameterType = "InvoiceCalculationInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime)
+select dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, /*일반 할인 ver 2 ( rate, amount 두개 다 있을 경우 rate 먼저 할인 타도록 설정 - rate) => 할인 금액이랑 tax 부과 매출항목별 부가세 계산 : 정률할인 공급가액 할인금액 계산 */
+       dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+     dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+     dis_cal.invoiceaplyday, sum(dis_cal.invoiceamount) as invoiceamount, sum(collectionbalanceamount) as collectionbalanceamount, dis_cal.auditid, dis_cal.auditdatetime 
+from (
+select inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber, /*일회성할인 공급가액 할인금액 계산 */
+       inv.customernumber, cd.discountid as revenueitemcode , '000' as invoiceclassificationcode,
+     inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+    datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+          (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else str_to_date(cd.effectstartdatetime, "%Y%m%d") end)) as invoiceaplyday,
+    (case when (inv.sum_inv_amt <![CDATA[>=]]> ifnull(cd.discountvalue,inv.sum_inv_amt)) then (ifnull(cd.discountvalue,inv.sum_inv_amt)*(-1)) else (inv.sum_inv_amt*(-1)) end ) as invoiceamount, 
+    (case when (inv.sum_inv_amt <![CDATA[>=]]> ifnull(cd.discountvalue,inv.sum_inv_amt)) then  (ifnull(cd.discountvalue,inv.sum_inv_amt)*(-1)) else (inv.sum_inv_amt*(-1)) end )as collectionbalanceamount, 
+    'BJW' as auditid, now() as auditdatetime
+from (
+    select ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+    ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, ic.revenueitemcode,
+   sum(ic.invoiceamount) as sum_inv_amt
+   from invoicecalculation ic , onetimefee otf
+   where ic.invoicedate = replace(#{calfromDate},'-','')
+   and ic.providernumber = #{providernumber}  /* 20180919 */
+   and ic.invoiceclassificationcode = '000'
+   and ic.revenueitemcode = otf.onetimefeeid
+   and ic.collectionbalanceamount != 0
+   and ic.invoicenumber is null
+   group by ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+    ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, ic.revenueitemcode ) inv, contractdiscount cd, discount d, onetimefee otf
+where inv.connumber = cd.connumber
+and str_to_date(cd.effectenddatetime, "%Y%m%d") <![CDATA[>=]]> str_to_date(inv.invoicestartdate, "%Y%m%d")
+and str_to_date(cd.effectstartdatetime, "%Y%m%d") <![CDATA[<=]]> str_to_date(inv.invoiceenddate, "%Y%m%d")
+and cd.discountid = d.discountid
+and cd.discounttype = d.discounttype
+and d.providernumber = otf.providernumber
+and d.discounttype = otf.onetimefeetype
+and inv.revenueitemcode = otf.onetimefeeid
+and inv.providernumber = d.providernumber /* 20180919 */
+) dis_cal
+group by dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+         dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+       dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+       dis_cal.invoiceaplyday, dis_cal.auditid, dis_cal.auditdatetime 
+   </insert>
+   <insert id="setInvoiceDetail"  parameterType = "InvoiceCalculationInput" useGeneratedKeys="true" keyProperty="connumber" >
+    insert into invoicedetail (providernumber , invoicenumber, invoicedate, connumber, paymentinformationnumber, customernumber,
+       revenueitemcode, invoiceclassificationcode, invoiceitemamount, collectionbalanceamount, auditid,auditdatetime )
+select ic.providernumber , NULL, ic.invoicedate, ic.connumber, ic.paymentinformationnumber, ic.customernumber,
+       ic.revenueitemcode, ic.invoiceclassificationcode, sum(ic.invoiceamount) as invoiceitemamount, 
+       sum(ic.collectionbalanceamount) as collectionbalanceamount, 'BJW' as auditid, now() as auditdatetime
+from invoicecalculation ic
+where ic.connumber not in (
+    select distinct i.connumber
+    from invoicedetail i 
+    where i.invoicedate = replace(#{calfromDate},'-','')  /*이미 invoicedetail에 insert시 동일 일자로 청구된 connumber들은 제외 처리 */
+    and i.providernumber = #{providernumber} /* 20180919 */
+ and i.prepayyn = 'N' )
+and ic.invoicenumber is null
+and ic.prepayyn ='N'
+and ic.providernumber = #{providernumber} /* 20180919 */
+AND ic.invoicedate = replace(#{calfromDate},'-','')
+group by ic.providernumber , ic.invoicenumber, ic.invoicedate, ic.connumber, ic.paymentinformationnumber, ic.customernumber,
+         ic.revenueitemcode, ic.invoiceclassificationcode,'BJW', now()
+   </insert>
+      <update id="updateInvoiceDetail" parameterType = "InvoiceCalculationInput">
+update invoicedetail id2, 
+  (select 
+  nextval(invoicenumber_seq) as invoicenumber, 
+  create_inv_number.connumber, 
+  create_inv_number.providernumber, 
+    create_inv_number.invoicedate, create_inv_number.customernumber, create_inv_number.prepayyn
+      from (
+        select id.providernumber, id.connumber, id.invoicedate, id.paymentinformationnumber, id.customernumber, id.prepayyn
+        from invoicedetail id
+        where id.invoicedate = replace(#{calfromDate},'-','')
+        and id.providernumber = #{providernumber} /* 20180919 */
+  and id.invoicenumber is null
+        group by id.providernumber, id.connumber, id.invoicedate, id.paymentinformationnumber, id.customernumber, id.prepayyn
+       )create_inv_number
+    )inv_num  
+set id2.invoicenumber = inv_num.invoicenumber 
+where id2.providernumber = inv_num.providernumber
+and id2.invoicedate = inv_num.invoicedate
+and id2.invoicenumber is null
+and id2.connumber = inv_num.connumber
+and id2.customernumber = inv_num.customernumber
+and id2.prepayyn ='N'
+   </update>
+   
+      <update id="updateInvoiceCalculation" parameterType = "InvoiceCalculationInput">
+     update invoicecalculation ic, invoicedetail id
+  set ic.invoicenumber = id.invoicenumber
+  where ic.providernumber = id.providernumber
+  and ic.connumber = id.connumber
+  and ic.invoicedate = id.invoicedate
+  and id.invoicedate = replace(#{calfromDate},'-','')
+  and id.providernumber = #{providernumber} /* 위에 1000000 조건 삭제 20180919 */
+  and ic.customernumber = id.customernumber
+  and ic.invoicenumber is null
+  and ic.paymentinformationnumber = id.paymentinformationnumber
+    and ic.prepayyn = 'N'
+  and id.prepayyn = 'N'
+   </update>
+   
+   
+   <insert id="setInvoice"  parameterType = "InvoiceCalculationInput" useGeneratedKeys="true" keyProperty="connumber" >
+    insert into invoice (providernumber, invoicenumber, invoicedate, connumber, paymentinformationnumber, customernumber, totalinvoiceamount,
+   adjustamount, invoiceamount, collectionbalanceamount, collectioncloseyn, paymentstatecode, auditid, auditdatetime)
+select id.providernumber, id.invoicenumber, id.invoicedate, id.connumber, id.paymentinformationnumber, id.customernumber, 
+   (case when (id.invoiceclassificationcode = '000') then sum(id.invoiceitemamount) else 0 end) as totalinvoiceamount,
+   (case when (id.invoiceclassificationcode = '001') then sum(id.invoiceitemamount) else 0 end) as adjustamount,
+   sum(id.invoiceitemamount) as invoiceamount, sum(id.collectionbalanceamount) as collectionbalanceamount, 
+   (case when (sum(id.collectionbalanceamount) = 0 ) then 'Y' else 'N' end) as collectioncloseyn, 
+ '0000' as paymentstatecode, 'BJW' as auditid, now() as auditdatetime   
+from invoicedetail id
+where id.connumber not in (
+  select distinct i.connumber
+  from invoice i 
+  where i.invoicedate = replace(#{calfromDate},'-','')
+  and i.providernumber = #{providernumber}  /* 20180919 */
+  and i.prepayyn = 'N'
+  ) /*이미 invoice에 insert시 동일 일자로 청구된 connumber들은 제외 처리 */
+  and id.invoicedate = replace(#{calfromDate},'-','')
+  and id.providernumber = #{providernumber}  /* 20180919 */
+  and id.prepayyn = 'N'
+group by providernumber, invoicenumber, invoicedate, connumber, paymentinformationnumber, customernumber, 'BJW', now()
+   </insert>
+   
+   <update id="updateInvoiceZero" parameterType = "InvoiceCalculationInput">
+update invoice i, contract c
+set i.collectionbalanceamount = 0,
+    i.collectioncloseyn = 'Y',
+    i.paymentstatecode = '1000'
+where i.invoicedate = replace(#{calfromDate},'-','')
+and i.providernumber = #{providernumber}  /* 20180919 */
+and i.connumber = c.connumber
+and c.contractstate = 'ACTIVATION'
+and c.recurringinvoiceyn = 'N'
+and i.prepayyn = 'N'
+and c.customernumber = i.customernumber
+and c.paymentinformationnumber = i.paymentinformationnumber
+and i.invoicedate = c.nextinvoicedatetime
+   </update>
+   
+   
+      <update id="updateInvoiceDetailZero" parameterType = "InvoiceCalculationInput">
+  update invoicedetail id, contract c
+  set id.collectionbalanceamount = 0
+  where id.invoicedate = replace(#{calfromDate},'-','')
+  and id.invoiceclassificationcode = '000'
+  and id.connumber = c.connumber
+  and c.contractstate = 'ACTIVATION'
+  and c.recurringinvoiceyn = 'N'
+  and id.prepayyn = 'N'
+  and c.customernumber = id.customernumber
+  and c.paymentinformationnumber = id.paymentinformationnumber
+  and id.invoicedate = c.nextinvoicedatetime
+  and id.providernumber = #{providernumber}  /* 20180919 */
+  and id.providernumber = c.providernumber /* 20180919 */
+   </update>
+   
+   
+     <update id="updateInvoiceCalculationZero" parameterType = "InvoiceCalculationInput">
+  update invoicecalculation ic, contract c
+  set ic.collectionbalanceamount = 0
+  where ic.invoicedate = replace(#{calfromDate},'-','')
+  and ic.providernumber = #{providernumber} /* 20180919 */
+  and ic.providernumber = c.providernumber  /* 20180919 */
+  and ic.invoiceclassificationcode = '000'
+  and ic.connumber = c.connumber
+  and c.contractstate = 'ACTIVATION'
+  and c.recurringinvoiceyn = 'N'
+  and ic.prepayyn = 'N'
+  and c.customernumber = ic.customernumber
+  and c.paymentinformationnumber = ic.paymentinformationnumber
+  and ic.invoicedate = c.nextinvoicedatetime
+   </update>
+   
+<update id="updateLastInvoicedt" parameterType = "InvoiceCalculationInput">
+update invoice i , contract ct
+ set ct.lastinvoicedatetime = ct.nextinvoicedatetime
+ where (i.paymentstatecode ='0000' or (i.paymentstatecode = '1000' and ct.recurringinvoiceyn = 'N'))
+ and i.invoicedate = replace(#{calfromDate},'-','')
+ and i.providernumber = #{providernumber} /* 20180919  providernumber = 1000000 조건 삭제 */
+ and i.providernumber = ct.providernumber  /* 20180919 */
+ and i.connumber = ct.connumber
+ and i.prepayyn = 'N'
+ and i.customernumber = ct.customernumber
+ and i.paymentinformationnumber = ct.paymentinformationnumber
+ and i.invoicedate = ct.nextinvoicedatetime
+   </update>
+   
+ <update id="updateNextInvoicedt" parameterType = "InvoiceCalculationInput">
+ update invoice i , contract ct
+  set ct.nextinvoicedatetime = date_format((case when ( ct.invoicecycle = 'MONTH' ) then date_add(ct.nextinvoicedatetime, interval +1 month ) else date_add(ct.nextinvoicedatetime, interval +1 week ) end ), "%Y%m%d")
+  , ct.deliveryremaincount = case when ( ct.deliveryremaincount > 0 ) then (ct.deliveryremaincount = ct.deliveryremaincount - 1) else 0 end
+  where (i.paymentstatecode ='0000' or (i.paymentstatecode = '1000' and ct.recurringinvoiceyn = 'N'))
+  and i.invoicedate = replace(#{calfromDate},'-','')
+  and i.providernumber = ct.providernumber
+  and i.providernumber = #{providernumber} /* 20180919  providernumber = 1000000 조건 삭제 */
+  and i.connumber = ct.connumber
+  and i.prepayyn = 'N'
+  and i.customernumber = ct.customernumber
+  and i.paymentinformationnumber = ct.paymentinformationnumber
+  and i.invoicedate = ct.lastinvoicedatetime
+   </update>
+   
+   
+ <select id="getZeroInvoicetoDelivery" resultType="Invoice"  parameterType = "InvoiceCalculationInput" >
+ select i.*
+ from invoice i, contract c 
+ where i.invoicedate = replace(#{calfromDate},'-','')
+ and i.prepayyn = 'N'
+ and i.connumber = c.connumber
+ and c.contractstate = 'ACTIVATION'
+ and c.recurringinvoiceyn = 'N' 
+ and i.providernumber = c.providernumber /* 20180919 */
+ and i.providernumber = #{providernumber} /* 20180919 */
+ </select>
+   
+<!-- 선납시작 --> 
+<insert id="setInvoiceCalculationPrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, prepayyn, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime) 
+select fee.providernumber, null as invoicenumber, fee.connumber, paymentinformationnumber, fee.customernumber, 'Y' as prepayyn,
+fee.productid as revenueitemcode, '000' as invoiceclassificationcode, fee.nextinvoicedatetime as invoicedate, fee.invoicestartdate, fee.invoiceenddate, fee.totinvoiceday,
+fee.invoiceaplyday, fee.invoiceamount as invoiceamount, fee.invoiceamount as collectionbalanceamount, 'BJW' as auditid, now() as auditdatetime
+from (
+ select  '월정액' as cl, 
+   inv_obj.*
+ , cp.productid
+ , cp.producttype
+ , cp.packageid
+ , cp.packagepricereferenceyn
+ , cp.packagevarietyyn
+ , cp.quantity
+ , cp.effectstartdatetime
+ , cp.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cp.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cp.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cp.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cp.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ case when (inv_obj.invoicecycle = 'MONTH') 
+ then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes*inv_obj.duration)  
+                 else (cp.quantity*inv_obj.deliverytimes * 4*inv_obj.duration) end) 
+ else (cp.quantity*inv_obj.deliverytimes*inv_obj.duration) end  
+ as totquantity, 
+ p.productname, p.priceamount, p.taxobjectyn, 
+ (p.priceamount*(case when (inv_obj.invoicecycle = 'MONTH') 
+      then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes *inv_obj.duration) 
+                 else (cp.quantity*inv_obj.deliverytimes * 4 *inv_obj.duration) end) 
+      else (cp.quantity*inv_obj.deliverytimes *inv_obj.duration) end)) as invoiceamount
+ from (  
+    select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.duration, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, 
+   date_format(c.subscribedatetime, "%Y%m%d") as nextinvoicedatetime, date_format(c.subscribedatetime, "%Y%m%d") as invoicestartdate, 
+  date_format(date_add(c.subscribedatetime, interval +1 day), "%Y%m%d") as invoiceenddate, 1 as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and date_format(c.subscribedatetime, "%Y%m%d") = #{calfromDate}
+    and c.recurringinvoiceyn ='N'
+    and c.connumber = #{connumber}
+ and c.providernumber = #{providernumber}
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = #{calfromDate} and pre_i.providernumber =  #{providernumber} )   
+ ) inv_obj, contractproduct cp, product p
+ where inv_obj.connumber = cp.connumber
+ and cp.producttype in ( 'NORMAL', 'COUPONCOUNT', 'COUPONPRICE')
+ and cp.productid = p.productid
+ and cp.producttype = p.producttype 
+ and cp.packageid is null
+ and cp.packagepricereferenceyn is null
+ and cp.packagevarietyyn is null
+ and p.packageyn = 'N'
+ and inv_obj.providernumber = p.providernumber
+ union all 
+ select  '고정금액package' as cl, 
+ inv_obj.*, cp.productid, cp.producttype, cp.packageid, cp.packagepricereferenceyn, cp.packagevarietyyn, cp.quantity, cp.effectstartdatetime, cp.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cp.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cp.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cp.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cp.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ case when (inv_obj.invoicecycle = 'MONTH') 
+ then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes*inv_obj.duration)  
+                 else (cp.quantity*inv_obj.deliverytimes * 4*inv_obj.duration) end) 
+ else (cp.quantity*inv_obj.deliverytimes*inv_obj.duration) end
+ as totquantity, 
+ p.productname, p.priceamount, p.taxobjectyn, 
+ (p.priceamount*(case when (inv_obj.invoicecycle = 'MONTH') 
+      then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes*inv_obj.duration)  
+                 else (cp.quantity*inv_obj.deliverytimes * 4*inv_obj.duration) end) 
+      else (cp.quantity*inv_obj.deliverytimes*inv_obj.duration) end)) as invoiceamount
+ from (  
+    select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.duration, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, 
+   date_format(c.subscribedatetime, "%Y%m%d") as nextinvoicedatetime, date_format(c.subscribedatetime, "%Y%m%d") as invoicestartdate, 
+  date_format(date_add(c.subscribedatetime, interval +1 day), "%Y%m%d") as invoiceenddate, 1 as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and date_format(c.subscribedatetime, "%Y%m%d") = #{calfromDate}
+    and c.recurringinvoiceyn ='N'
+    and c.connumber = #{connumber}
+    and c.providernumber = #{providernumber}
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = #{calfromDate} and pre_i.providernumber =  #{providernumber}  ) 
+ ) inv_obj, contractproduct cp, product p
+ where inv_obj.connumber = cp.connumber
+ and cp.producttype = 'PACKAGE'
+ and cp.productid = p.productid
+ and cp.producttype = p.producttype 
+ and cp.packageid is not null
+ and p.packageyn = 'Y'
+ and p.packagepricereferenceyn = 'N'
+ and inv_obj.providernumber = p.providernumber
+ union all
+ select  '변동금액package' as cl, 
+ inv_obj.*, pkp.productid, cp.producttype, cp.packageid, cp.packagepricereferenceyn, cp.packagevarietyyn, cp.quantity, cp.effectstartdatetime, cp.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cp.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cp.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cp.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cp.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ case when (inv_obj.invoicecycle = 'MONTH') 
+ then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes*inv_obj.duration)  
+                 else (cp.quantity*inv_obj.deliverytimes * 4*inv_obj.duration) end) 
+ else (cp.quantity*inv_obj.deliverytimes*inv_obj.duration) end 
+ as totquantity, 
+ pkp.productname, pkp.priceamount, pkp.taxobjectyn, 
+ (pkp.priceamount*(case when (inv_obj.invoicecycle = 'MONTH') 
+      then (case when inv_obj.deliverycycle = 'MONTH' then (cp.quantity*inv_obj.deliverytimes*inv_obj.duration)  
+                 else (cp.quantity*inv_obj.deliverytimes * 4*inv_obj.duration) end) 
+      else (cp.quantity*inv_obj.deliverytimes*inv_obj.duration) end)) as invoiceamount
+ from (  
+    select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.duration, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, 
+   date_format(c.subscribedatetime, "%Y%m%d") as nextinvoicedatetime, date_format(c.subscribedatetime, "%Y%m%d") as invoicestartdate, 
+  date_format(date_add(c.subscribedatetime, interval +1 day), "%Y%m%d") as invoiceenddate, 1 as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and date_format(c.subscribedatetime, "%Y%m%d") = #{calfromDate}
+    and c.recurringinvoiceyn ='N'
+    and c.connumber = #{connumber}
+ and c.providernumber = #{providernumber}
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = #{calfromDate} and pre_i.providernumber =  #{providernumber}  )    
+ ) inv_obj, contractproduct cp, product p, productpackage pp, product pkp
+ where inv_obj.connumber = cp.connumber
+ and cp.producttype = 'PACKAGE'
+ and cp.productid = p.productid
+ and cp.producttype = p.producttype 
+ and cp.packageid = pp.packageid
+ and cp.packagepricereferenceyn = 'Y'
+ and p.packagepricereferenceyn = 'Y'
+ and p.packageyn = 'Y'
+ and p.productid = pp.mainproductid
+ and inv_obj.invoicestartdate between pp.effectstartdatetime and pp.effectenddatetime
+ and pp.compositionproductid = pkp.productid
+ and inv_obj.invoicestartdate between pkp.subscribestartdatetime and pkp.subscribeenddatetime
+ and pkp.producttype = 'NORMAL'
+ and inv_obj.providernumber = p.providernumber
+ and inv_obj.providernumber = pp.providernumber
+ and inv_obj.providernumber = pkp.providernumber
+ union all 
+ select  '일회성' as cl, 
+ inv_obj.*, cotf.onetimefeeid as productid, otf.onetimefeetype as producttype, null as packageid, null as packagepricereferenceyn, null as packagevarietyyn, 
+ cotf.quantity, cotf.effectstartdatetime,  cotf.effectenddatetime,
+ datediff(case when (datediff(str_to_date(cotf.effectenddatetime, "%Y%m%d") , str_to_date(inv_obj.invoiceenddate, "%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cotf.effectenddatetime, "%Y%m%d") else str_to_date(inv_obj.invoiceenddate, "%Y%m%d") end , 
+          case when (datediff(str_to_date(inv_obj.invoicestartdate, "%Y%m%d"), str_to_date(cotf.effectstartdatetime,"%Y%m%d")) <![CDATA[<]]>  0 ) then str_to_date(cotf.effectstartdatetime, "%Y%m%d") else str_to_date(inv_obj.invoicestartdate, "%Y%m%d") end ) as invoiceaplyday,
+ (case when (otf.onetimefeetype = 'DELIVERY') 
+ then (case when (inv_obj.invoicecycle = 'MONTH')
+      then (case when inv_obj.deliverycycle = 'MONTH' 
+         then (cotf.quantity*inv_obj.deliverytimes) 
+     else (cotf.quantity*inv_obj.deliverytimes * 4)  end )
+   else (cotf.quantity*inv_obj.deliverytimes) end)
+ else (1) end ) as totquantity, 
+ otf.onetimefeename, otf.priceamount, otf.taxobjectyn, 
+ (case when (otf.onetimefeetype = 'DELIVERY') 
+ then (otf.priceamount *
+  (case when (inv_obj.invoicecycle = 'MONTH')
+   then (case when inv_obj.deliverycycle = 'MONTH' 
+         then (cotf.quantity*inv_obj.deliverytimes*inv_obj.duration)
+     else (cotf.quantity*inv_obj.deliverytimes * 4*inv_obj.duration) end )
+   else (cotf.quantity*inv_obj.deliverytimes) end) )
+  else (otf.priceamount*1) end ) as invoiceamount    
+ from (  
+    select c.connumber, c.customernumber, c.providernumber, c.paymentinformationnumber, c.duration, c.deliverycycle, c.deliverytimes, c.invoicecycle, c.lastinvoicedatetime, 
+   date_format(c.subscribedatetime, "%Y%m%d") as nextinvoicedatetime, date_format(c.subscribedatetime, "%Y%m%d") as invoicestartdate, 
+  date_format(date_add(c.subscribedatetime, interval +1 day), "%Y%m%d") as invoiceenddate, 1 as totinvoiceday
+    from contract c
+    where c.contractstate = 'ACTIVATION'
+    and date_format(c.subscribedatetime, "%Y%m%d") = #{calfromDate}
+    and c.recurringinvoiceyn ='N'
+    and c.connumber = #{connumber}
+ and c.providernumber = #{providernumber}
+    and c.connumber not in ( select pre_i.connumber from invoice pre_i where pre_i.invoicedate = #{calfromDate} and pre_i.providernumber =  #{providernumber}  ) 
+ ) inv_obj, contractonetimefee cotf, onetimefee otf
+ where inv_obj.connumber = cotf.connumber
+ and cotf.onetimefeeid = otf.onetimefeeid
+ and inv_obj.providernumber = otf.providernumber
+) fee
+</insert>
+<insert id="setInvoiceCalculationDiscountRatePrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, prepayyn, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime)
+select dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber,
+       dis_cal.customernumber, 'Y' as prepayyn, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+     dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+     dis_cal.invoiceaplyday, sum(dis_cal.invoiceamount) as invoiceamount, sum(collectionbalanceamount) as collectionbalanceamount, dis_cal.auditid, dis_cal.auditdatetime 
+from (
+ select inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber, 
+        inv.customernumber, cd.discountid as revenueitemcode , '000' as invoiceclassificationcode,
+      inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+     datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]>  str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+           (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else  str_to_date(cd.effectstartdatetime, "%Y%m%d")end)) as invoiceaplyday,
+     sum(truncate((inv.invoiceamount*cd.discountvalue/100),0)*(-1)) as invoiceamount, 
+     sum(truncate((inv.invoiceamount*cd.discountvalue/100),0)*(-1)) as collectionbalanceamount, 
+     'BJW' as auditid, now() as auditdatetime 
+ from (
+     select ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, ic.revenueitemcode,
+     ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, ic.invoiceamount,  p.taxobjectyn
+    from invoicecalculation ic, product p
+    where ic.invoicedate = #{calfromDate}
+    and ic.connumber = #{connumber}
+    and ic.invoiceclassificationcode = '000'
+    and ic.revenueitemcode not in ( select onetimefeeid from onetimefee where providernumber = #{providernumber} )
+    and ic.collectionbalanceamount != 0
+    and ic.revenueitemcode = p.productid
+    and ic.invoicenumber is null
+    and ic.providernumber = p.providernumber
+ and ic.providernumber = #{providernumber}
+    ) inv, discount d, contractdiscount cd
+ where inv.connumber = cd.connumber
+ and cd.discounttype = 'RATE'
+ and cd.discountid = d.discountid
+ and cd.discounttype = d.discounttype
+ and inv.providernumber = d.providernumber
+ group by inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber,
+        inv.customernumber, cd.discountid , '000',
+      inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+      datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+           (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[<=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else  str_to_date(cd.effectstartdatetime, "%Y%m%d")end)) ,     
+     'BJW', now() 
+ ) dis_cal, contract c
+where dis_cal.providernumber = c.providernumber
+and dis_cal.connumber = c.connumber
+and dis_cal.customernumber = c.customernumber
+and dis_cal.paymentinformationnumber = c.paymentinformationnumber
+group by dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+         dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+       dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+       dis_cal.invoiceaplyday, dis_cal.auditid, dis_cal.auditdatetime
+</insert>
+<insert id="setInvoiceCalculationDiscountAmountPrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, prepayyn, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime)
+select dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+       dis_cal.customernumber, 'Y' as prepayyn, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+     dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+     dis_cal.invoiceaplyday, sum(dis_cal.invoiceamount)* c.duration as invoiceamount, sum(collectionbalanceamount)* c.duration as collectionbalanceamount, dis_cal.auditid, dis_cal.auditdatetime 
+from (
+select inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber,
+       inv.customernumber, cd.discountid as revenueitemcode , '000' as invoiceclassificationcode,
+     inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+    datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+          (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else str_to_date(cd.effectstartdatetime, "%Y%m%d") end)) as invoiceaplyday,
+    (case when (inv.sum_inv_amt <![CDATA[>=]]> cd.discountvalue) then (cd.discountvalue*(-1)) else (inv.sum_inv_amt*(-1)) end ) as invoiceamount, 
+    (case when (inv.sum_inv_amt <![CDATA[>=]]> cd.discountvalue) then (cd.discountvalue*(-1)) else (inv.sum_inv_amt*(-1)) end )as collectionbalanceamount, 
+    'BJW' as auditid, now() as auditdatetime
+from (
+    select ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+    ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, 
+   sum(ic.invoiceamount) as sum_inv_amt
+   from invoicecalculation ic
+   where ic.invoicedate = #{calfromDate}
+   and ic.connumber = #{connumber}
+   and ic.invoiceclassificationcode = '000'
+   and ic.revenueitemcode not in ( select onetimefeeid from onetimefee where providernumber = #{providernumber} )
+   and ic.collectionbalanceamount != 0
+   and ic.invoicenumber is null
+   and ic.providernumber = #{providernumber}
+   group by ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+   ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday ) inv, contractdiscount cd
+where inv.connumber = cd.connumber
+and cd.discounttype = 'AMOUNT'
+ group by inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber,
+        inv.customernumber, cd.discountid , '000',
+      inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+      datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+           (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[<=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else  str_to_date(cd.effectstartdatetime, "%Y%m%d")end)) ,     
+     'BJW', now() 
+)dis_cal, contract c
+where dis_cal.providernumber = c.providernumber
+and dis_cal.connumber = c.connumber
+and dis_cal.customernumber = c.customernumber
+and dis_cal.paymentinformationnumber = c.paymentinformationnumber
+group by dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+         dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+       dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+       dis_cal.invoiceaplyday, dis_cal.auditid, dis_cal.auditdatetime
+</insert>
+<insert id="setInvoiceCalculationDiscountOneTimeFeePrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicecalculation (providernumber, invoicenumber, connumber, paymentinformationnumber, customernumber, prepayyn, revenueitemcode, invoiceclassificationcode,
+invoicedate, invoicestartdate, invoiceenddate, totinvoiceday, invoiceaplyday, invoiceamount, collectionbalanceamount, auditid, auditdatetime)
+select dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+       dis_cal.customernumber, 'Y' as prepayyn, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+     dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+     dis_cal.invoiceaplyday, sum(dis_cal.invoiceamount)* c.duration  as invoiceamount, sum(collectionbalanceamount)* c.duration as collectionbalanceamount, dis_cal.auditid, dis_cal.auditdatetime 
+from (
+select inv.providernumber, inv.invoicenumber, inv.connumber, inv.paymentinformationnumber, 
+       inv.customernumber, cd.discountid as revenueitemcode , '000' as invoiceclassificationcode,
+     inv.invoicedate, inv.invoicestartdate, inv.invoiceenddate, inv.totinvoiceday,
+    datediff((case when (str_to_date(inv.invoiceenddate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectenddatetime, "%Y%m%d")) then str_to_date(cd.effectenddatetime, "%Y%m%d") else str_to_date(inv.invoiceenddate, "%Y%m%d") end),
+          (case when (str_to_date(inv.invoicestartdate, "%Y%m%d") <![CDATA[>=]]> str_to_date(cd.effectstartdatetime, "%Y%m%d")) then str_to_date(inv.invoicestartdate, "%Y%m%d") else str_to_date(cd.effectstartdatetime, "%Y%m%d") end)) as invoiceaplyday,
+    (case when (inv.sum_inv_amt >= ifnull(cd.discountvalue,inv.sum_inv_amt)) then (ifnull(cd.discountvalue,inv.sum_inv_amt)*(-1)) else (inv.sum_inv_amt*(-1)) end ) as invoiceamount, 
+    (case when (inv.sum_inv_amt >= ifnull(cd.discountvalue,inv.sum_inv_amt)) then  (ifnull(cd.discountvalue,inv.sum_inv_amt)*(-1)) else (inv.sum_inv_amt*(-1)) end ) as collectionbalanceamount, 
+    'BJW' as auditid, now() as auditdatetime
+from (
+    select ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+    ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, ic.revenueitemcode,
+   sum(ic.invoiceamount) as sum_inv_amt
+   from invoicecalculation ic , onetimefee otf
+   where ic.invoicedate = #{calfromDate}
+   and ic.connumber = #{connumber}
+   and ic.invoiceclassificationcode = '000'
+   and ic.revenueitemcode = otf.onetimefeeid
+   and ic.collectionbalanceamount != 0
+   and ic.invoicenumber is null
+   and ic.providernumber = #{providernumber}
+   and ic.providernumber = otf.providernumber
+   group by ic.providernumber, ic.invoicenumber, ic.paymentinformationnumber, ic.connumber, ic.customernumber, 
+    ic.invoicedate, ic.invoicestartdate, ic.invoiceenddate, ic.totinvoiceday, ic.revenueitemcode) inv, contractdiscount cd, discount d, onetimefee otf, contract c
+where inv.connumber = cd.connumber
+and cd.discountid = d.discountid
+and cd.discounttype = d.discounttype
+and inv.providernumber = c.providernumber
+and c.providernumber = d.providernumber
+and d.providernumber = otf.providernumber
+and d.discounttype = otf.onetimefeetype
+and inv.revenueitemcode = otf.onetimefeeid
+) dis_cal, contract c
+where dis_cal.providernumber = c.providernumber
+and dis_cal.connumber = c.connumber
+and dis_cal.customernumber = c.customernumber
+and dis_cal.paymentinformationnumber = c.paymentinformationnumber
+group by dis_cal.providernumber, dis_cal.invoicenumber, dis_cal.connumber, dis_cal.paymentinformationnumber, 
+         dis_cal.customernumber, dis_cal.revenueitemcode , dis_cal.invoiceclassificationcode,
+       dis_cal.invoicedate, dis_cal.invoicestartdate, dis_cal.invoiceenddate, dis_cal.totinvoiceday,
+       dis_cal.invoiceaplyday, dis_cal.auditid, dis_cal.auditdatetime 
+</insert>
+<insert id="setInvoiceDetailPrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" useGeneratedKeys="true" keyProperty="connumber" >
+insert into invoicedetail (providernumber , invoicenumber, invoicedate, connumber, paymentinformationnumber, customernumber, prepayyn,
+       revenueitemcode, invoiceclassificationcode, invoiceitemamount, collectionbalanceamount, auditid,auditdatetime ) 
+select ic.providernumber , NULL, ic.invoicedate, ic.connumber, ic.paymentinformationnumber, ic.customernumber, 'Y' as prepayyn,
+       ic.revenueitemcode, ic.invoiceclassificationcode, sum(ic.invoiceamount) as invoiceitemamount, 
+       sum(ic.collectionbalanceamount) as collectionbalanceamount, 'BJW' as auditid, now() as auditdatetime
+from invoicecalculation ic
+where ic.connumber not in (
+    select distinct i.connumber
+    from invoicedetail i 
+    where i.connumber = #{connumber}
+    and i.invoicedate = #{calfromDate}
+ and i.providernumber = #{providernumber} ) 
+and ic.invoicenumber is null
+AND ic.invoicedate = #{calfromDate}
+and ic.connumber = #{connumber}
+and ic.providernumber = #{providernumber}
+group by ic.providernumber , ic.invoicenumber, ic.invoicedate, ic.connumber, ic.paymentinformationnumber, ic.customernumber,
+         ic.revenueitemcode, ic.invoiceclassificationcode,'BJW', now() 
+</insert>
+<update id="updateInvoiceDetailPrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" >
+update invoicedetail id2, 
+  (select 
+  nextval(invoicenumber_seq) as invoicenumber, 
+  create_inv_number.connumber, 
+  create_inv_number.providernumber, 
+    create_inv_number.invoicedate, create_inv_number.customernumber
+      from (
+        select id.providernumber, id.connumber, id.invoicedate, id.paymentinformationnumber, id.customernumber
+        from invoicedetail id
+        where id.invoicedate = #{calfromDate}
+        and id.invoicenumber is null
+        and id.connumber = #{connumber}
+  and id.providernumber = #{providernumber}
+        and id.prepayyn = 'Y'
+        group by id.providernumber, id.connumber, id.invoicedate, id.paymentinformationnumber, id.customernumber
+       )create_inv_number
+    )inv_num  
+set id2.invoicenumber = inv_num.invoicenumber 
+where id2.providernumber = inv_num.providernumber
+and id2.invoicedate = inv_num.invoicedate
+and id2.invoicenumber is null
+and id2.connumber = inv_num.connumber
+and id2.customernumber = inv_num.customernumber
+and id2.prepayyn = 'Y'
+</update>
+<update id="updateInvoiceCalculationPrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" >
+    update invoicecalculation ic, invoicedetail id
+  set ic.invoicenumber = id.invoicenumber
+  where ic.providernumber = id.providernumber
+  and id.providernumber = #{providernumber}
+  and ic.connumber = id.connumber
+  and ic.invoicedate = id.invoicedate
+  and ic.connumber = #{connumber}
+  and id.invoicedate = #{calfromDate}
+  and ic.invoicenumber is null
+  and ic.customernumber = id.customernumber
+  and ic.prepayyn = 'Y'
+  and id.prepayyn = 'Y'
+  and ic.revenueitemcode = id.revenueitemcode
+  and ic.paymentinformationnumber = id.paymentinformationnumber
+</update>
+<insert id="setInvoicePrepay"  parameterType = "InvoiceCreatePrePayInvoiceInput" useGeneratedKeys="true" keyProperty="connumber" >
+    insert into invoice (providernumber, invoicenumber, invoicedate, connumber, paymentinformationnumber, customernumber, prepayyn, totalinvoiceamount,
+   adjustamount, invoiceamount, collectionbalanceamount, collectioncloseyn, paymentstatecode, auditid, auditdatetime)
+select id.providernumber, id.invoicenumber, id.invoicedate, id.connumber, id.paymentinformationnumber, id.customernumber, 'Y' as prepayyn,
+   (case when (id.invoiceclassificationcode = '000') then sum(id.invoiceitemamount) else 0 end) as totalinvoiceamount,
+   (case when (id.invoiceclassificationcode = '001') then sum(id.invoiceitemamount) else 0 end) as adjustamount,
+   sum(id.invoiceitemamount) as invoiceamount, sum(id.collectionbalanceamount) as collectionbalanceamount, 
+   (case when (sum(id.collectionbalanceamount) = 0 ) then 'Y' else 'N' end) as collectioncloseyn, 
+ '0000' as paymentstatecode, 'BJW' as auditid, now() as auditdatetime   
+from invoicedetail id
+where id.connumber not in (
+   select distinct i.connumber
+   from invoice i 
+   where i.invoicedate = #{calfromDate}
+   and i.prepayyn = 'Y'
+   and i.connumber = #{connumber} 
+   and i.providernumber = #{providernumber}
+  )
+  and id.invoicedate = #{calfromDate}
+  and id.connumber = #{connumber}
+  and id.prepayyn = 'Y'
+  and id.providernumber = #{providernumber}
+group by providernumber, invoicenumber, invoicedate, connumber, paymentinformationnumber, customernumber, 'Y', 'BJW', now()
+</insert>
+<select id = "getPrePayInvoice"  parameterType =  "InvoiceCreatePrePayInvoiceInput" resultType="PaymentPrePayInvoiceInput">
+select i.invoicenumber 
+       , i.connumber
+   , i.invoicedate
+from invoice i
+where i.invoicedate = #{calfromDate}
+and i.connumber = #{connumber}
+and i.providernumber = #{providernumber}
+</select>
+
+<!-- 선납 인보이스 생성  끝 -->
+ 
+ 
+ 
+   
+   <select id="getCalculationInvoice" parameterType="InvoiceCalculationInput" resultType="InvoiceCalculation">
+   select 
+   case when ( i.prepayyn = 'N') then '정기결제' else '일괄결제' end as paymenttype
+  ,i.invoicenumber
+  ,date_format(i.invoicedate, '%Y-%m-%d') as invoicedate
+  ,c.customername 
+  ,pd.productname
+  ,i.totalinvoiceamount
+  ,i.collectionbalanceamount
+  from  invoice i
+       ,customer c
+       ,contract crt
+       ,product  pd
+       ,contractproduct cp
+  where i.providernumber = #{providernumber}
+  and   i.providernumber = c.providernumber /* 20180919 */
+  and   i.providernumber = crt.providernumber /* 20180919 */
+  and   i.providernumber = pd.providernumber /* 20180919 */
+  and   i.customernumber = c.customernumber
+        and   i.invoicedate = replace(#{calfromDate},'-','')
+  and   i.connumber = cp.connumber
+  and   crt.connumber = cp.connumber
+  and   cp.productid  = pd.productid  
+  order by 1 
+   </select>
+   
+   
+   <select id="getInvoiceRecurringpayment" parameterType="InvoiceCalculationInput" resultType="InvoiceCalculation">
+   select 
+  case when ( i.prepayyn = 'N') then '정기결제' else '일괄결제' end as paymenttype
+  ,i.invoicenumber
+  ,date_format(i.invoicedate, '%Y-%m-%d') as invoicedate
+  ,c.customername 
+  ,pd.productname
+  ,i.totalinvoiceamount
+  ,i.collectionbalanceamount
+  ,crt.connumber
+  from  invoice i
+       ,customer c
+       ,contract crt
+       ,product  pd
+       ,contractproduct cp
+  where i.providernumber = #{providernumber}
+  and   i.providernumber = c.providernumber /* 20180919 */
+  and   i.providernumber = crt.providernumber /* 20180919 */
+  and   i.providernumber = pd.providernumber /* 20180919 */
+  and   i.customernumber = c.customernumber
+  and   i.invoicedate = replace(#{calfromDate},'-','')
+  and   i.connumber = cp.connumber
+  and   crt.connumber = cp.connumber
+  and   cp.productid  = pd.productid  
+  and   i.recurringpaymentyn = 'Y'
+  order by 1 
+   </select>
+   
+   <select id="getPaymentHistory" resultType="PaymentHistoryDetail">
+    select date_format(pay.paymentdatetime, '%Y-%m-%d %H:%i:%s') as paymentdatetime
+   ,code1.codename       as paymenttypecodename
+   ,code2.codename       as paymentmethodcodename
+   ,pay.paymentamount
+   ,emp.employeename 
+   ,reason_list.reasoncodename as reason
+   ,ifnull(pay.etc,'') etc
+  from paymenthistory pay
+   ,codegroupdetail code1
+   ,codegroupdetail code2      
+   ,login log
+   ,employee emp
+   , (select 
+   'PAYMENT' as paygubun
+   , code3.code as reasoncode
+   , code3.codename as reasoncodename
+    from codegroupdetail code3
+    where code3.codegroupid ='errorreasoncode'
+  union all 
+    select 'REFUND' as paygubun
+   , code4.code as reasoncode
+   , code4.codename as reasoncodename
+    from codegroupdetail code4
+    where code4.codegroupid = 'refundreasoncode' ) as reason_list       
+  where 1=1
+  and pay.providernumber    = #{providernumber}
+  and pay.invoicenumber     = #{InvoiceNumber}
+  and pay.connumber         = #{conNumber}
+  and code1.codegroupid     = 'paymenttypecode'
+  and pay.paymenttypecode   = code1.code
+  and code2.codegroupid     = 'paymentmethodcode'
+  and pay.paymentmethodcode = code2.code
+  and pay.auditid           = log.loginid
+  and log.employeenumer     = emp.employeenumber
+  and pay.errorreasoncode = reason_list.reasoncode
+  and pay.paymenttypecode   = reason_list.paygubun
+  union all
+  select date_format(adj.adjustdate, '%Y-%m-%d %H:%i:%s') as paymentdatetime
+    ,code2.codename   as paymenttypecodename
+    ,''        as paymentmethodcodename
+    ,sum(adj.adjustamount) as paymentamount
+    ,emp.employeename
+    ,code1.codename        as adjustrequestreasoncodename
+    ,adj.adjustrequestcontent   as etc
+   from invoiceadjust adj
+    ,login log
+    ,employee emp
+    ,codegroupdetail code1
+    ,codegroupdetail code2
+  where 1=1
+   and adj.providernumber    = #{providernumber}
+   and adj.invoicenumber     = #{InvoiceNumber}
+   and adj.connumber         = #{conNumber}
+   and adj.invoicedate       = replace(#{InvoiceDate},'-','')
+   and adj.auditid           = log.loginid
+   and log.employeenumer     = emp.employeenumber
+   and code1.codegroupid     = 'adjustrequestreasoncode'
+   and adj.adjustrequestreasoncode = code1.code
+   and code2.codegroupid = 'adjuststatecode'
+   and code2.code = adj.adjuststatecode
+  group by STR_TO_DATE(adj.adjustdate, '%Y%m%d%H%i%s'), '요금조정', code2.codename , emp.employeename, code1.codename, adj.adjustrequestcontent
+  order by paymentdatetime desc
+  LIMIT #{pageStart}, #{perPageNum}
+   </select>
+  
+  <select id="getPaymentHistoryTotCount" resultType="int">
+  select sum(cnt) from (
+   select STR_TO_DATE(pay.paymentdatetime, '%Y%m%d%H%i%s') as paymentdatetime
+   ,code1.codename       as paymenttypecodename
+   ,code2.codename       as paymentmethodcodename
+   ,pay.paymentamount
+   ,emp.employeename 
+   ,reason_list.reasoncodename as reason
+   ,ifnull(pay.etc,'') etc
+   ,count(1) cnt
+  from paymenthistory pay
+   ,codegroupdetail code1
+   ,codegroupdetail code2      
+   ,login log
+   ,employee emp
+   , (select 
+   'PAYMENT' as paygubun
+   , code3.code as reasoncode
+   , code3.codename as reasoncodename
+    from codegroupdetail code3
+    where code3.codegroupid ='errorreasoncode'
+  union all 
+    select 'REFUND' as paygubun
+   , code4.code as reasoncode
+   , code4.codename as reasoncodename
+    from codegroupdetail code4
+    where code4.codegroupid = 'refundreasoncode' ) as reason_list       
+  where 1=1
+  and pay.providernumber    = #{providernumber}
+  and pay.invoicenumber     = #{InvoiceNumber}
+  and pay.connumber         = #{conNumber}
+  and code1.codegroupid     = 'paymenttypecode'
+  and pay.paymenttypecode   = code1.code
+  and code2.codegroupid     = 'paymentmethodcode'
+  and pay.paymentmethodcode = code2.code
+  and pay.auditid           = log.loginid
+  and log.employeenumer     = emp.employeenumber
+  and pay.errorreasoncode = reason_list.reasoncode
+  and pay.paymenttypecode   = reason_list.paygubun
+  union all
+  select STR_TO_DATE(adj.adjustdate, '%Y%m%d%H%i%s') as paymentdatetime
+    ,code2.codename   as paymenttypecodename
+    ,''        as paymentmethodcodename
+    ,sum(adj.adjustamount) as paymentamount
+    ,emp.employeename
+    ,code1.codename        as adjustrequestreasoncodename
+    ,adj.adjustrequestcontent   as etc
+    ,count(1) cnt
+   from invoiceadjust adj
+    ,login log
+    ,employee emp
+    ,codegroupdetail code1
+    ,codegroupdetail code2
+  where 1=1
+   and adj.providernumber    = #{providernumber}
+   and adj.invoicenumber     = #{InvoiceNumber}
+   and adj.connumber         = #{conNumber}
+   and adj.invoicedate       = replace(#{InvoiceDate},'-','')
+   and adj.auditid           = log.loginid
+   and log.employeenumer     = emp.employeenumber
+   and code1.codegroupid     = 'adjustrequestreasoncode'
+   and adj.adjustrequestreasoncode = code1.code
+   and code2.codegroupid = 'adjuststatecode'
+   and code2.code = adj.adjuststatecode
+  group by STR_TO_DATE(adj.adjustdate, '%Y%m%d%H%i%s'), '요금조정', code2.codename , emp.employeename, code1.codename, adj.adjustrequestcontent
+  order by paymentdatetime desc
+  ) a
+   </select> 
+   
+      <select id="getInvoiceTaxItemAmount" resultType="InvoiceTaxItemInfo" >
+   select (i.invoiceamount + i.adjustamount - truncate((i.invoiceamount + i.adjustamount)/11,0)) as invoiceItemAmount,
+       truncate((i.invoiceamount + i.adjustamount)/11,0) as vatAmount
+ from invoice i 
+ where i.invoicedate= replace(#{InvoiceDate},'-','')
+ and i.invoicenumber =  #{InvoiceNumber} 
+ and i.connumber = #{conNumber}
+ and i.providernumber = #{providernumber}
+   </select>
+   
+   <select id="getInvoiceAdjust" resultType="InvoiceAdjust">
+ select  
+ inv.invoiceNumber
+ ,inv.invoiceClassificationCode
+ ,inv.revenueItemCodnm
+ ,inv.revenueItemCode
+ ,sum(inv.000_inv_amt) as invoiceItemAmount
+ ,case when (sum(inv.collectionBalanceAmount) > 0) then sum(inv.collectionBalanceAmount) else 0 end as adjustPossibleAmount
+ ,ifnull(inv.taxyn,'N') as taxYn
+ ,ifnull(inv.adjPossibleYn,'N') as adjPossibleYn
+ from (
+   select
+    id.invoicenumber as invoiceNumber
+   ,gubun_list.gubun as invoiceClassificationCode
+   ,gubun_list.revenueitemcode as revenueItemCode
+   ,gubun_list.revenueitemname as revenueItemCodnm
+   ,case when ( id.invoiceclassificationcode = '000') then sum(id.invoiceItemamount) else 0 end as 000_inv_amt
+   ,id.collectionbalanceamount as collectionBalanceAmount
+   ,gubun_list.taxyn as taxyn
+   ,gubun_list.adjPossibleYn
+   ,gubun_list.ordernum
+   from  
+    invoicedetail id
+    ,invoice i 
+    ,(select 
+     case when (p.producttype = 'ETC') then 4 else 1 end as ordernum
+     , case when (p.producttype = 'ETC') then '부가세' else '기본료' end as gubun
+     , p.productid as revenueitemcode
+     , p.productname as revenueitemname
+     , p.providernumber as providernumber
+     , p.taxobjectyn as taxyn
+     , p.subscribestartdatetime as subscribestartdatetime
+     , p.subscribeenddatetime as subscribeenddatetime
+     , case when (p.producttype = 'ETC') then 'N' else 'Y' end as adjPossibleYn
+     from product p
+  where p.providernumber = #{providernumber}  
+     union all
+     select 
+   case when (d.discounttype = 'ETC') then 5 else 2 end as ordernum
+     ,case when (d.discounttype = 'ETC') then '부가세' else '할인' end as gubun
+     ,d.discountid as revenueitemcode
+     ,d.discountname as revenueitemname 
+     ,d.providernumber as providernumber
+     ,NULL as taxyn
+     ,d.subscribestartdatetime as subscribestartdatetime 
+     ,d.subscribeenddatetime as subscribeenddatetime
+     , 'N' as adjPossibleYn
+     from discount d
+  where d.providernumber = #{providernumber}
+     union all
+     select 3 as ordernum 
+     , '일회성' as gubun 
+     , otf.onetimefeeid as revenueitemcode
+     , otf.onetimefeename as revenueitemname
+     , otf.providernumber as providernumber
+     , otf.taxobjectyn as taxyn
+     , otf.subscribestartdatetime as subscribestartdatetime
+     , otf.subscribeenddatetime as subscribeenddatetime
+     ,'Y' as adjPossibleYn
+     from onetimefee otf
+  where otf.providernumber = #{providernumber}
+     ) gubun_list 
+   where id.invoicedate =  replace(#{InvoiceDate},'-','') /* 청구일자 셋팅 */ 
+   and  id.invoicenumber = #{InvoiceNumber}
+   and  id.connumber = #{conNumber}
+   and  id.revenueitemcode = gubun_list.revenueitemcode
+   and  i.providernumber = id.providernumber
+   and  i.invoicenumber = id.invoicenumber
+   and  i.invoicedate = id.invoicedate
+   and  i.connumber = id.connumber
+   and  i.collectioncloseyn = 'N'
+   and  i.providernumber = #{providernumber}
+   and  id.invoicedate between gubun_list.subscribestartdatetime and gubun_list.subscribeenddatetime
+   group by   
+    id.invoicenumber 
+   ,gubun_list.gubun 
+   ,gubun_list.revenueitemname  
+   ,id.collectionbalanceamount 
+   ,gubun_list.ordernum
+   ,gubun_list.taxyn
+   ,gubun_list.adjPossibleYn
+   ,gubun_list.revenueitemcode
+ )inv  
+group by  
+ invoiceNumber
+ ,invoiceClassificationCode
+ ,revenueItemCode
+ ,inv.taxyn
+ ,inv.adjPossibleYn
+ ,inv.revenueItemCodnm
+order by inv.ordernum
+   </select>
+   
+   
+    <insert id="setPaymentHistory"  parameterType = "PaymentHistoryInput" useGeneratedKeys="true" keyProperty="connumber" >
+  insert into paymenthistory
+   ( providernumber
+    ,invoicenumber
+    ,connumber
+    ,paymentdatetime
+    ,paymenttypecode
+    ,paymentamount
+    ,paymentmethodcode
+    ,refundyn
+    ,cardcorporationcode
+    ,cardapprovenumber
+    ,recurringpaymentyn
+    ,errorreasoncode
+    ,refundreasoncode
+    ,etc
+    ,auditid
+    )
+    values
+    (
+      #{providernumber} /* 실제 처리하는 providernumber */
+     ,#{invoicenumber} /* 실제 처리하는 invoicenumber */
+     ,#{connumber} /* 실제 처리하는 connumber */
+     ,date_format(current_timestamp, '%Y%m%d%H%i%s')
+     ,'PAYMENT'
+     ,#{paymentamt}    /* 수납금액 : invoice의 미납금액으로 */
+     ,#{paymenttypecode}   /* 처리하는 수납 방법 공통코드 참조.   CARD BANK CASH 11PAY */
+     ,'N'     
+     ,'06'     /* card사 코드 공통코드 참고 */
+     , 123123   /* 승인번호 직접 key-in 해서 입력 */
+     , ifnull((select recurringpaymentyn from invoice i where i.providernumber = #{providernumber} and i.invoicenumber = #{invoicenumber}  and connumber = #{connumber} limit 1),'N')
+     ,'000'     
+     ,''
+     ,ifnull(#{memo},'')
+     ,'BJW'
+    )
+   </insert>
+   <update id="updateColInvoice" parameterType = "PaymentHistoryInput">
+   update invoice
+    set collectionbalanceamount = 0
+      ,collectioncloseyn = 'Y'
+      ,paymentstatecode = '1000'
+      ,auditid = 'BJW'
+      ,auditdatetime = CURRENT_TIMESTAMP
+ where 1=1
+   and invoicenumber = #{invoicenumber}
+   and invoicedate =  replace(#{invoicedate},'-','')
+   and connumber = #{connumber}
+   </update>
+   
+    <update id="updateColInvoiceDetail" parameterType = "PaymentHistoryInput">
+    update invoicedetail
+     set collectionbalanceamount = 0
+       ,auditid = 'BJW'
+       ,auditdatetime = CURRENT_TIMESTAMP
+   where 1=1
+     and invoicenumber = #{invoicenumber}
+     and invoicedate =  replace(#{invoicedate},'-','')
+     and connumber = #{connumber}
+   </update> 
+   
+   
+   <insert id="setRefundHistory"  parameterType = "PaymentHistoryInput" useGeneratedKeys="true" keyProperty="connumber" >
+  insert into paymenthistory
+   ( providernumber
+    ,invoicenumber
+    ,connumber
+    ,paymentdatetime
+    ,paymenttypecode
+    ,paymentamount
+    ,paymentmethodcode
+    ,refundyn
+    ,cardcorporationcode
+    ,cardapprovenumber
+    ,recurringpaymentyn
+    ,errorreasoncode
+    ,refundreasoncode
+    ,etc
+    ,auditid
+    )
+    values
+    (
+      #{providernumber} /* 실제 처리하는 providernumber */
+     ,#{invoicenumber} /* 실제 처리하는 invoicenumber */
+     ,#{connumber} /* 실제 처리하는 connumber */
+     ,date_format(current_timestamp, '%Y%m%d%H%i%s')
+     ,'REFUND'
+     ,#{paymentamt}    /* 수납금액 : invoice의 미납금액으로 */
+     ,#{paymenttypecode}   /* 처리하는 수납 방법 공통코드 참조.   CARD BANK CASH 11PAY */
+     ,'N'     
+     ,'06'     /* card사 코드 공통코드 참고 */
+     , '1234'   /* 승인번호 직접 key-in 해서 입력 */
+     ,'N' 
+     ,'999'     /* 실제 환불 사유코드로 */   
+     ,''
+     ,ifnull(#{memo},'')
+     ,'BJW'
+    )
+   </insert>
+   <update id="updaterefundColInvoice" parameterType = "PaymentHistoryInput">
+   update invoice
+    set collectionbalanceamount = (#{paymentamt})*-1
+      ,collectioncloseyn = 'N'
+      ,paymentstatecode = '0000'
+      ,auditid = 'BJW'
+      ,auditdatetime = CURRENT_TIMESTAMP
+ where 1=1
+   and providernumber = #{providernumber}
+   and invoicenumber = #{invoicenumber}
+   and invoicedate = replace(#{invoicedate},'-','')
+   and connumber = #{connumber}
+   </update>   
+   
+   <update id="updaterefundColInvoiceDetail" parameterType = "PaymentHistoryInput">
+      update invoicedetail
+      set collectionbalanceamount = invoiceitemamount
+       ,auditid = 'BJW'
+       ,auditdatetime = CURRENT_TIMESTAMP
+    where 1=1
+    and providernumber = #{providernumber}
+    and invoicenumber = #{invoicenumber}
+    and invoicedate = replace(#{invoicedate},'-','')
+    and connumber = #{connumber}
+   </update> 
+   
+   
+   <insert id="setInvoiceAdjust"  parameterType = "InvoiceAdjustInput" useGeneratedKeys="true" keyProperty="connumber" >
+   insert into invoiceadjust
+   (providernumber, invoicenumber, invoicedate, connumber, paymentinformationnumber,
+   customernumber, revenueitemcode, adjustdate, adjustclassificationcode, adjuststatecode,
+   adjustamount, adjustrequestreasoncode, adjustrequestcontent, auditid, auditdatetime) 
+   select inv_dtl.providernumber
+   , inv_dtl.invoicenumber
+   , inv_dtl.invoicedate
+   , inv_dtl.connumber
+   , inv_dtl.paymentinformationnumber
+   , inv_dtl.customernumber
+   , inv_dtl.revenueitemcode
+   , date_format(now(), '%Y%m%d%H%i%S') as adjustdate
+   , '006' as adjustclassificationcode
+   , 'REQUEST' as adjuststatecode
+   , #{adjustamt} as adjustamount
+   , '0001' as adjustrequestreasoncode
+   , ifnull(#{adjustreasonmessage}, '요청내용없음') as adjustrequestcontent
+   , 'BJW' as auditid
+   , now() as auditdatetime 
+   from (
+    select id.providernumber, id.invoicenumber, id.invoicedate, id.connumber, id.paymentinformationnumber,
+    id.customernumber, id.revenueitemcode, 
+    sum(id.collectionbalanceamount) as col_bamt, 1000 as adj_req_amt
+    from invoicedetail id
+    where id.invoicedate = replace(#{invoicedate},'-','')
+    and id.invoicenumber = #{invoicenumber}
+    and id.connumber = #{conNumber}
+    and id.revenueitemcode = #{revenueItemCode}
+    and id.providernumber = #{providernumber} /* 20180919 */
+    group by id.providernumber, id.invoicenumber, id.invoicedate, id.connumber, id.paymentinformationnumber,
+    id.customernumber, id.revenueitemcode
+    ) inv_dtl
+   </insert>
+   <update id="updateInvoiceAdjust" parameterType = "InvoiceAdjustInput">
+   update invoicedetail idtl, invoiceadjust adj
+ set idtl.invoiceItemamount = (idtl.invoiceItemamount + adj.adjustamount)
+     ,idtl.collectionbalanceamount = (idtl.collectionbalanceamount + adj.adjustamount)
+     ,idtl.auditid = 'BJW'
+     ,idtl.auditdatetime = now()
+ where adj.invoicenumber = idtl.invoicenumber
+ and adj.invoicedate = idtl.invoicedate 
+ and adj.connumber = idtl.connumber
+ and adj.paymentinformationnumber = idtl.paymentinformationnumber
+ and adj.customernumber = idtl.customernumber
+ and adj.revenueitemcode = idtl.revenueitemcode
+ and adj.adjuststatecode = 'REQUEST'
+ and idtl.invoiceclassificationcode = '006'
+ and adj.invoicenumber = #{invoicenumber}
+ and adj.connumber = #{conNumber}
+ and adj.invoicedate = #{invoicedate}
+ and adj.revenueitemcode = #{revenueItemCode}
+ and idtl.providernumber = adj.providernumber
+ and idtl.providernumber = #{providernumber} /* 20180919 */
+   </update>
+   <insert id="setInvoiceAdjustInvoiceDetail"  parameterType = "InvoiceAdjustInput" useGeneratedKeys="true" keyProperty="connumber" >
+   insert into invoicedetail (providernumber, invoicenumber, invoicedate, connumber, paymentinformationnumber, 
+ customernumber, revenueitemcode, invoiceclassificationcode, invoiceItemamount, 
+ collectionbalanceamount, auditid, auditdatetime )
+  select adj.providernumber
+  , adj.invoicenumber
+  , adj.invoicedate
+  , adj.connumber
+  , adj.paymentinformationnumber
+  , adj.customernumber
+  , adj.revenueitemcode
+  , adj.adjustclassificationcode as invoiceclassificationcode
+  , adj.adjustamount as invoiceItemamount
+  , adj.adjustamount as collectionbalanceamount
+  , 'BJW' as auditid
+  , now() as auditdatetime
+  from invoiceadjust adj
+  where adj.auditid ='BJW'
+  and adj.adjuststatecode = 'REQUEST'
+  and adj.invoicenumber =  #{invoicenumber}
+  and adj.connumber = #{conNumber}
+  and adj.invoicedate =  #{invoicedate}
+  and adj.revenueitemcode = #{revenueItemCode}
+  and adj.providernumber = #{providernumber} /* 20180919 */
+   </insert>
+   
+   <update id="updateInvoiceAdjustInvoiceDetail" parameterType = "InvoiceAdjustInput">
+   update invoice i ,
+   (select
+   v.invoicenumber 
+   ,v.invoicedate 
+   ,v.connumber
+   ,v.customernumber
+   ,v.paymentinformationnumber
+   ,sum(v.000_i) as tot_inv_amt
+   ,sum(v.006_i) as adj_amt
+   ,sum(v.collectionbalanceamount ) as col_bamt
+   ,case when(sum(v.collectionbalanceamount = 0)) then 'Y' else 'N' end as closeYn
+   ,case when(sum(v.collectionbalanceamount = 0)) then '1000' else '0000' end as paymentstatecode
+   from (
+   select  
+   id.providernumber /* 20180919 */
+   ,id.invoicenumber 
+   ,id.invoicedate 
+   ,id.connumber
+   ,id.customernumber
+   ,id.paymentinformationnumber
+   ,id.revenueitemcode /* 매출항목 조건 꼭 있어야함 !! 안그러면 미납금액 안맞음 */ 
+   , case when (id.invoiceclassificationcode = '000') then sum(id.collectionbalanceamount) else 0 end as 000_i
+   , case when (id.invoiceclassificationcode = '006') then sum(id.invoiceItemamount) else 0 end as 006_i
+   ,id.collectionbalanceamount 
+   from invoicedetail id
+   where id.invoicedate = #{invoicedate}
+   and id.invoicenumber =#{invoicenumber}
+   and id.connumber =#{conNumber}
+   and id.providernumber = #{providernumber} /* 20180919 */
+   group by 
+   id.providernumber /* 20180919 */
+   ,id.invoicenumber
+   ,id.invoicedate 
+   ,id.connumber
+   ,id.customernumber
+   ,id.revenueitemcode
+   ,id.collectionbalanceamount 
+   ,id.paymentinformationnumber
+   )v
+   group by   
+   v.providernumber /* 20180919 */
+   ,v.invoicenumber 
+   ,v.invoicedate 
+   ,v.connumber
+   ,v.customernumber
+   ,v.paymentinformationnumber 
+   ) adj_aply
+ set i.adjustamount = adj_aply.adj_amt
+     ,i.collectionbalanceamount = adj_aply.col_bamt
+     ,i.collectioncloseyn = adj_aply.closeYn
+     ,i.paymentstatecode = adj_aply.paymentstatecode
+     ,auditid = 'BJW' 
+     ,auditdatetime = now() 
+ where i.invoicenumber = adj_aply.invoicenumber
+ and i.invoicedate = adj_aply.invoicedate
+ and i.connumber = adj_aply.connumber
+ and i.paymentinformationnumber = adj_aply.paymentinformationnumber
+ and i.customernumber = adj_aply.customernumber
+ and i.invoicedate = #{invoicedate}
+ and i.connumber = #{conNumber}
+ and i.invoicenumber = #{invoicenumber}
+   </update>
+    <update id="updateInvoiceAdjustAply" parameterType = "InvoiceAdjustInput">
+    update invoiceadjust adj
+ set adj.adjuststatecode = 'APLY'
+ where adj.invoicenumber = #{invoicenumber}
+ and adj.invoicedate =#{invoicedate}
+ and adj.connumber = #{conNumber}
+ and adj.revenueitemcode = #{revenueItemCode}
+ and adj.adjuststatecode = 'REQUEST'
+ and adj.providernumber = #{providernumber} /* 20180919 */
+    </update>
+ 
+    <select id="checkInvoiceAdjust" resultType="int">
+    select count(id.invoicenumber) as count
+ from invoicedetail id 
+ where id.invoiceclassificationcode = '006'
+ and id.invoicenumber = #{invoicenumber}
+ and id.connumber = #{conNumber}
+ and id.invoicedate = replace(#{invoicedate},'-','') /* 청구일자 셋팅 */ 
+ and id.revenueitemcode = #{revenueItemCode}
+ and id.providernumber = #{providernumber} /* 20180919 */
+    </select>
+ 
+
+    <select id="sendInvoiceSum" resultType="int">
+    select ifnull(sum(i.collectionbalanceamount),0) as collectionBalanceAmount
+  from invoice i
+  where i.providernumber = #{providernumber}
+  and i.connumber = #{conNumber}
+  and i.invoicenumber = #{InvoiceNumber}
+  and i.invoicedate = replace(#{InvoiceDate},'-','')
+    </select>    
+ 
+    <select id="getInvoiceDetailProductInfo" resultType="InvoiceDetailProductInfo">
+    select c.customername as customerName
+    , p.productid as mainProductId
+    , p.productname as mainProductName
+    , p.producttype as mainProductType
+    , pp.compositionproductid as compositionProductId
+    , p1.productname as compositionProductName
+    , concat("(",p1.priceamount,"원)") as compositionPriceAmount
+  from customer c, contract ct, invoice i, contractproduct cp, product p
+       left outer join ( productpackage pp, product p1 )
+       on (p.providernumber  = pp.providernumber
+     and p.productid = pp.mainproductid
+     and p1.providernumber = p.providernumber
+     and pp.compositionproductid = p1.productid
+     and replace(#{InvoiceDate},'-','') between pp.effectstartdatetime and pp.effectenddatetime
+  )
+  where c.customernumber = ct.customernumber
+  and c.providernumber = ct.providernumber
+  and ct.connumber = cp.connumber
+  and cp.producttype not in ('ETC')
+  and p.providernumber = c.providernumber
+  and c.providernumber = #{providernumber} /* 20180919 */
+  and c.providernumber = i.providernumber /* 20180919 */
+  and p.productid = cp.productid 
+  and i.invoicedate = replace(#{InvoiceDate},'-','')
+  and i.invoicenumber = #{InvoiceNumber} 
+  and i.connumber = ct.connumber
+    </select>    
+</mapper>
+
+
+ 

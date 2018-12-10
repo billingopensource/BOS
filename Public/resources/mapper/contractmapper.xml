@@ -1,0 +1,752 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.api.repository.ContractRepository">
+	
+	<resultMap id="customerResult" type="com.api.billing.model.customer.Customer"> 
+		<result property="customerNumber" column="customernumber"/> 
+		<result property="customerName" column="customername"/> 
+		<result property="providernumber" column="providernumber"/>
+		<result property="sex" column="sex"/>
+		<result property="birthday" column="birthday"/>
+		<result property="email" column="email"/>
+		<result property="phoneNumber" column="phonenumber"/>
+		<result property="deliveryAddressId" column="deliveryaddressid"/>
+		<result property="customerType" column="customertype"/>
+		<result property="createDate" column="createdate"/>
+		<result property="currentDate" column="currentdate"/>
+		<result property="deleteDate" column="deletedate"/>
+		<result property="zipcode" column="zipcode"/>
+		<result property="baseAddress" column="baseaddress"/>
+		<result property="detailAddress" column="detailaddress"/>
+	</resultMap>
+	
+	<resultMap id="customerListResult" type="com.api.billing.model.customer.Customer"> 
+		<result property="customerNumber" column="customernumber"/>
+		<result property="customerName" column="customername"/>
+		<result property="phoneNumber" column="phonenumber"/>
+		<result property="baseAddress" column="baseaddress"/>
+		<result property="detailAddress" column="detailaddress"/>
+	</resultMap>
+	
+	<resultMap id="contractListResult" type="com.api.billing.model.contract.ContractListResult">
+		<result property="customerNumber" column="customernumber"/>
+		<result property="conNumber" column="connumber"/>
+		<result property="contractState" column="contractstate"/>
+		<result property="productName" column="productname"/>
+		<result property="priceAmount" column="priceamount"/>
+		<result property="effectStartDateTime" column="effectstartdatetime"/>
+		<result property="effectEndDateTime" column="effectenddatetime"/>
+		<result property="duration" column="duration"/>
+		<result property="recurringInvoiceYn" column="collectionbalanceamount"/>
+		<result property="deliveryCycle" column="deliverycycle"/>
+		<result property="invoiceCycle" column="invoicecycle"/>
+	</resultMap>
+	
+	<resultMap id="paymentInformationResult" type="com.api.billing.model.contract.PaymentInformation">
+		<result property="customerNumber" column="customernumber"/>
+		<result property="conNumber" column="connumber"/>
+		<result property="paymentInformationNumber" column="paymentinformationnumber"/>
+		<result property="paymentMethod" column="paymentmethod"/>
+	</resultMap>
+	
+	<resultMap id="contracctProductResult" type="com.api.billing.model.contract.ContractProduct">
+		<result property="customerNumber" column="customernumber"/>
+		<result property="conNumber" column="connumber"/>
+		<result property="paymentInformationNumber" column="paymentinformationnumber"/>
+		<result property="paymentMethod" column="paymentmethod"/>
+	</resultMap>
+	
+	<resultMap id="productResult" type="com.api.billing.model.product.Product3"> 
+		<result property="productId" column="productid"/>
+		<result property="productName" column="productname"/> 
+		<result property="providernumber" column="providernumber"/>
+		<result property="productType" column="producttype"/>
+		<result property="productState" column="productstate"/>
+		<result property="subscribeStartDateTime" column="subscribestartdatetime"/>
+		<result property="subscribeEndDateTime" column="subscribeenddatetime"/>
+		<result property="recurringDeleveryYn" column="recurringdeliveryyn"/>
+		<result property="priceAmount" column="priceamount"/>
+		<result property="taxObjectYn" column="taxobjectyn"/>
+		<result property="packageYn" column="packageyn"/>
+		<result property="packagePriceReferenceYn" column="packagepricereferenceyn"/>
+		<result property="packageVarietyYn" column="packagevarietyyn"/>
+		<result property="packagePriceBandwidth" column="packagepricebandwidth"/>
+		<result property="productDescription" column="productdescription"/>
+		<result property="beforeProductId" column="beforeproductid"/>
+		<result property="suspendPriceAmount" column="suspendpriceamount"/>
+		<result property="exposureYn" column="exposureyn"/>
+		<result property="lastChangeDateTime" column="lastchangedatetime"/>	
+	</resultMap>
+	
+	<resultMap id="discountResult" type="com.api.billing.model.product.Discount"> 
+		<result property="discountId" column="discountid"/>
+		<result property="discountName" column="discountname"/> 
+		<result property="providernumber" column="providernumber"/>
+		<result property="discountType" column="discounttype"/>
+		<result property="discountState" column="discountstate"/>
+		<result property="subscribeStartDateTime" column="subscribestartdatetime"/>
+		<result property="subscribeEndDateTime" column="subscribeenddatetime"/>
+		<result property="discountValue" column="discountvalue"/>
+		<result property="discountOrder" column="discountorder"/>
+		<result property="discountDescription" column="discountdescription"/>
+		<result property="beforeDiscountId" column="beforediscountid"/>
+		<result property="exposureYn" column="exposureyn"/>
+		<result property="lastChangeDateTime" column="lastchangedatetime"/>
+		<result property="discountType2" column="discounttype2"/>
+	 	<result property="discountType2Value" column="discounttype2value"/>
+		<result property="auditId" column="auditid"/>
+		<result property="auditDateTime" column="auditdatetime"/>
+	</resultMap>
+	
+	<resultMap id="couponBalanceResult" type="com.api.billing.model.contract.CouponBalance"> 
+		<result property="providernumber" column="providernumber"/> 
+		<result property="customerNumber" column="customernumber"/>
+		<result property="couponType" column="coupontype"/>
+		<result property="couponBalance" column="couponbalance"/>
+	</resultMap>
+	
+	<resultMap id="couponUseHistoryListResult" type="com.api.billing.model.contract.CouponUseHistory"> 
+		<result property="providernumber" column="providernumber"/> 
+		<result property="customerNumber" column="customernumber"/>
+		<result property="couponType" column="coupontype"/>
+		<result property="useDateTime" column="usedatetime"/>
+		<result property="couponUseType" column="couponusetype"/>
+		<result property="useAmount" column="useamount"/>
+		<result property="useHistory" column="usehistory"/>
+	</resultMap>
+	
+	
+	<select id="findCustomerByCustomerNumber" resultMap="customerResult">
+	  SELECT c.customernumber AS customernumber
+         , c.customername AS customername
+         , c.providernumber AS providernumber
+         , (SELECT cgd.codename
+     			  FROM   codegroupdetail cgd
+		        WHERE  cgd.codegroupid = 'SEXTYPE'
+		        AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+			      AND    c.sex = cgd.code) AS sex 
+         , c.birthday AS birthday
+         , c.email AS email
+         , c.phonenumber AS phonenumber
+         , c.deliveryaddressid AS deliveryaddressid
+         , (SELECT cgd.codename
+     			  FROM   codegroupdetail cgd
+		        WHERE  cgd.codegroupid = 'CUSTOMERTYPE'
+		        AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+			      AND    c.customertype = cgd.code) AS customertype
+         , c.createdate AS createdate
+         , c.currentdate AS currentdate
+         , c.deletedate AS deletedate
+         , a.addressid AS addressid
+         , a.zipcode AS zipcode
+         , a.baseaddress AS baseaddress
+         , a.detailaddress AS detailaddress
+	  FROM   customer c
+	  JOIN   address a
+	  ON     c.addressid = a.addressid
+	  WHERE  customernumber = #{customerNumber}
+	</select>
+	
+	<select id="findContractByCustomerNumber" resultMap="contractListResult">
+		SELECT co.customernumber AS customernumber 
+	       , co.connumber AS connumber
+		     , (SELECT cgd.codename
+   		      FROM   codegroupdetail cgd
+	          WHERE  cgd.codegroupid = 'CONTRACTSTATE'
+	          AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+		        AND    co.contractstate = cgd.code) AS contractstate
+		     , p.productname AS productname
+		     , CONCAT(SUBSTR(co.effectstartdatetime, 1, 4), '-', SUBSTR(co.effectstartdatetime, 5, 2), '-', SUBSTR(co.effectstartdatetime, 7, 2)) AS effectstartdatetime
+		     , CONCAT(SUBSTR(co.effectenddatetime, 1, 4), '-', SUBSTR(co.effectenddatetime, 5, 2), '-', SUBSTR(co.effectenddatetime, 7, 2)) AS effectenddatetime
+		     , co.duration AS duration
+		     , CASE WHEN p.packagepricereferenceyn = 'Y' THEN p.packagepricebandwidth
+		            WHEN p.packagepricereferenceyn = 'N' THEN p.priceamount
+		            ELSE p.priceamount
+		       END AS priceamount
+				 , (SELECT cgd.codename
+       		  FROM   codegroupdetail cgd
+			      WHERE  cgd.codegroupid = 'RECURRINGINVOICEYN'
+			      AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				    AND    co.recurringinvoiceyn = cgd.code) AS recurringinvoiceyn 
+		     , (SELECT cgd.codename
+   		      FROM   codegroupdetail cgd
+	          WHERE  cgd.codegroupid = 'DELIVERYCYCLE'
+	          AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+		        AND    co.deliverycycle = cgd.code) AS deliverycycle
+		     , (SELECT cgd.codename
+   			    FROM   codegroupdetail cgd
+	          WHERE  cgd.codegroupid = 'invoicecycle'
+	          AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+		        AND    co.invoicecycle = cgd.code) AS invoicecycle
+		FROM   contract co
+		JOIN   contractproduct cp
+		ON     co.connumber = cp.connumber
+		JOIN   product p
+		ON     cp.productid = p.productid
+		WHERE  co.customernumber = #{customerNumber}
+	</select>
+	
+	<select id="findPaymentInformationByConNumber" resultMap="paymentInformationResult">
+		SELECT co.customernumber
+		     , co.connumber
+		     , pif.paymentinformationnumber
+		     , pif.paymentmethod
+		FROM   contract co
+		JOIN   paymentinformation pif
+		ON     co.paymentinformationnumber = pif.paymentinformationnumber
+		WHERE  co.connumber = #{customerNumber}
+	</select>	
+	
+	<select id="findCustomerBySearchBar" resultMap="customerListResult" parameterType="com.api.billing.model.customer.CustomerSearchBar">
+	  SELECT c.customernumber AS customernumber
+         , c.customername AS customername
+         , c.phonenumber AS phonenumber
+         , a.baseaddress AS baseaddress
+         , a.detailaddress AS detailaddress
+	  FROM   customer c
+	  JOIN   address a
+	  ON     c.addressid = a.addressid
+	  WHERE  c.customername LIKE CONCAT('%', #{customerName}, '%')
+	  AND    c.phonenumber LIKE CONCAT('%', #{phoneNumber}, '%')
+	  and    c.providernumber = #{providernumber}
+	</select>
+
+	<!-- 	추가 -->
+	<select id="getFindCustomerList" resultType ="Customer" parameterType = "int" >
+    	select customerNumber
+    	      ,customerName
+    	      ,sex
+    	      ,phoneNumber
+    	      ,customerType
+    	from customer
+    	where customerNumber =  #{customerNumber}  
+    </select>
+    
+<!--20181115수정 상품 목록 조회 -->
+    <select id="getProductList" resultType="Product2">
+    <![CDATA[ 
+          select  pro.productid           productId
+     ,pro.productname        productName
+     ,pro.providernumber        providernumber
+     ,pro.productType     productType
+     ,code2.codename          productTypeCodeName
+     ,code1.codename          productState
+     ,DATE_FORMAT(pro.subscribestartdatetime , '%Y-%m-%d' ) subscribeStartDateTime
+     ,DATE_FORMAT(pro.subscribeenddatetime , '%Y-%m-%d' ) subscribeEndDateTime
+     ,IFNULL(pro.recurringdeliveryyn, '')     recurringDeleveryYn
+     ,CASE WHEN pro.packagepricereferenceyn = 'Y' THEN FORMAT(pro.packagepricebandwidth,0)
+                 ELSE FORMAT(pro.priceamount, 0)
+               END AS priceAmount
+              ,'원' AS priceAmountUnit 
+     ,IFNULL(pro.taxobjectyn, '')             taxObjectYn
+     ,IFNULL(pro.packageyn  , '')             packageYn
+     ,IFNULL(pro.packagepricereferenceyn ,'') packagePriceReferenceYn
+     ,CASE WHEN pro.packagepricereferenceyn = 'Y' THEN '종량형'
+           WHEN pro.packagepricereferenceyn = 'N' THEN '정액형'
+           ELSE '정액형'
+      END AS packagePriceReferenceYnCodeName
+     ,IFNULL(pro.packagevarietyyn   ,'')      packageVarietyYn
+     ,IFNULL(pro.packagepricebandwidth ,'')   packagePriceBandwidth
+     ,IFNULL(pro.productdescription  ,'')     productDescription
+     ,IFNULL(pro.beforeproductid ,'')         beforeProductId
+     ,IFNULL(pro.suspendpriceamount ,'')      suspendPriceAmount
+     ,pro.exposureyn                          exposureYn
+     ,IFNULL(pro.lastchangedatetime ,'')   lastChangeDateTime
+   from  product pro
+        ,codegroupdetail code1 
+        ,codegroupdetail code2
+   where  pro.producttype like concat('%',#{productType},'%')
+    and   pro.productname like concat('%',#{productName},'%')
+    and   pro.exposureyn ='Y'
+    and   code1.codegroupid ='PRODUCTSTATE'
+    and   code1.code = pro.productstate
+    and   code2.codegroupid ='PRODUCTTYPE'
+    and   code2.code = pro.producttype
+    and   providernumber = #{providernumber}
+    and subscribeStartDateTime <= sysdate()
+       and subscribeEndDateTime >= sysdate()  
+    order by 4 desc  
+  ]]>     
+    </select>
+
+    
+    <select id = "findProductTotalCount" resultType="int">
+    	select count(*)
+    	from product    	
+    </select>
+    
+     <!-- 할인 목록 조회 -->
+    <select id="findDiscountBySearchBar" resultType="Discount2" parameterType="DiscountSearchBar">
+    <![CDATA[ 
+    	SELECT d.discountid AS discountId
+	          , d.discountname AS discountName
+	          , d.providernumber AS providernumber
+	          , d.discounttype AS discountType
+	          , d.discountstate AS discountState
+	          , code.codename AS discountTypeCodeName
+	          , code2.codename AS discountStateCodeName
+	          , DATE_FORMAT(d.subscribestartdatetime , '%Y-%m-%d' ) AS subscribeStartDateTime
+	          , DATE_FORMAT(d.subscribeenddatetime , '%Y-%m-%d' ) AS subscribeEndDateTime
+	          , d.discountValue
+	          , CASE WHEN d.discounttype = 'RATE' THEN '%'
+	                 WHEN d.discounttype = 'AMOUNT' THEN '원'
+	                 END as discountValueUnit
+	          , d.discountdescription AS discountDescription
+	          , d.beforediscountid AS beforeDiscountId
+	          , d.exposureyn AS exposureYn
+	          , d.lastchangedatetime AS lastChangeDateTime
+	          , d.auditid AS auditId
+	          , d.auditdatetime AS auditDateTime
+	  	FROM   discount d
+	  		  ,codegroupdetail code
+	  		  ,codegroupdetail code2
+	  	WHERE  d.discounttype LIKE CONCAT('%', #{discountType}, '%')
+	  	AND    d.discountname LIKE CONCAT('%', #{discountName}, '%')
+	  	and    d.providernumber = #{providernumber}
+	  	AND    d.discounttype NOT IN ('DELIVERY', 'SETUPCOST', 'ETC')
+	  	AND    d.subscribestartdatetime <= sysdate()
+	  	AND    d.subscribeenddatetime >= sysdate()
+	  	AND    code.codegroupid ='DISCOUNTTYPE'
+	  	AND    code.code = d.discounttype
+	  	AND    code2.codegroupid ='DISCOUNTSTATE'
+	  	AND	   code2.code = d.discountstate
+	  	ORDER BY code.codename,  d.discountid
+		 
+	]]> 				
+    </select>
+    
+<!--     20181115 수정 자동할인등록 -->
+<select id="getFindApplyDiscount" resultType="Discount2" >
+    <![CDATA[
+     select  d.discountid AS discountId
+           , d.discountname AS discountName
+           , d.providernumber AS providernumber
+           , d.discounttype AS discountType
+           , d.discountstate AS discountState
+           , code.codename AS discountTypeCodeName
+           , code2.codename AS discountStateCodeName
+           , DATE_FORMAT(d.subscribestartdatetime , '%Y-%m-%d' ) AS subscribeStartDateTime
+           , DATE_FORMAT(d.subscribeenddatetime , '%Y-%m-%d' ) AS subscribeEndDateTime
+           , d.discountValue 
+           , CASE WHEN d.discounttype = 'RATE' THEN '%'
+                  WHEN d.discounttype = 'AMOUNT' THEN '원'
+                  END as discountValueUnit
+           , d.discountdescription AS discountDescription
+           , d.beforediscountid AS beforeDiscountId
+           , d.exposureyn AS exposureYn
+           , d.lastchangedatetime AS lastChangeDateTime
+           , d.auditid AS auditId
+           , d.auditdatetime AS auditDateTime 
+     from  discount d
+      , codegroupdetail code
+      , codegroupdetail code2
+       where  discounttype2value <= #{duration}
+       AND    d.discounttype NOT IN ('DELIVERY', 'SETUPCOST', 'ETC')
+    AND    d.providernumber = #{providernumber}
+    AND    d.subscribestartdatetime <= sysdate()
+    AND    d.subscribeenddatetime >= sysdate()
+    AND    code.codegroupid ='DISCOUNTTYPE'
+    AND    code.code = d.discounttype
+    AND    code2.codegroupid ='DISCOUNTSTATE'
+    AND    code2.code = d.discountstate
+  order by CAST(discounttype2value as signed) desc
+  limit 1   
+  ]]>  
+    </select>
+                 
+    <insert id="createDeliveryAddress" keyProperty="addressId">
+		INSERT 
+		INTO   address
+		       (
+		          addressid
+				    , zipcode
+				    , baseaddress
+				    , detailaddress
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          CONCAT('ADD',NEXTVAL(addressid_seq))
+		        , #{zipcode}
+		        , #{baseAddress}
+		        , #{detailAddress}
+		        , 'TEST'
+		        , NOW()
+		        )
+		<selectKey resultType="string" keyProperty="addressId" order="AFTER">
+        SELECT LAST_INSERT_ID()
+        </selectKey>        
+	</insert>
+	
+	<select id="findDeliverAddressId" resultType="Address" >
+    <![CDATA[ 
+    	select addressId		    	
+		from address
+		where zipcode = #{zipcode}
+		and baseaddress = #{baseAddress}
+		and detailaddress = #{detailAddress}
+		limit 1				 
+		]]> 				
+    </select>
+    
+    <insert id="paymentInfoInsert" keyProperty="paymentInformationNumber">
+		INSERT 
+		INTO   paymentinformation
+		       (
+		            customernumber
+				    , paymentmethod
+				    , deliveryaddressid
+				    , invoicedeliverytype
+				    , invoiceemail
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          
+		          #{customerNumber}
+		        , #{paymentMethod}
+		        , #{deliveryAddressId}
+		        , #{invoiceDeliveryType}
+		        , #{invoiceEmail}
+		        , 'TEST'
+		        , NOW()
+		       )
+		<selectKey resultType="int" keyProperty="paymentInformationNumber" order="AFTER">
+        SELECT LAST_INSERT_ID()
+        </selectKey>	       
+	</insert>
+	
+	<insert id="createContract" keyProperty="conNumber">
+		INSERT 
+		INTO   contract
+		       (
+		            customernumber
+				    , providernumber
+				    , paymentinformationnumber
+				    , contractstate
+				    , subscribedatetime
+				    , effectstartdatetime
+				    , effectenddatetime
+				    , recurringdeliveryyn
+				    , deliverycycle
+				    , deliverytimes
+				    , deliveryremark
+				    , deliverystartdatetime
+				    , recurringinvoiceyn
+				    , invoicecycle
+				    , nextinvoicedatetime
+				    , auditid
+				    , auditdatetime
+				    , deliverytotalcount
+				    , deliveryremaincount
+				    , duration
+			  )
+			VALUES (
+					 #{customerNumber}
+					, #{providernumber}
+			        , #{paymentInformationNumber}
+			        , 'ACTIVATION'
+			        , DATE_FORMAT(NOW(),'%Y%m%d')
+			        , #{effectStartDateTime}
+			        , #{effectEndDateTime}
+			        , 'Y'
+			        , #{deliveryCycle}
+			        , 1
+			        , #{deliveryRemark}
+			        , #{deliveryStartDatetime}
+			        , #{recurringInvoiceYn}
+			        , #{invoiceCycle}
+			        , #{deliveryStartDatetime}
+			        , 'TEST'
+			        , NOW()
+			        , #{deliveryTotalCount}
+			        , #{deliveryRemainCount}
+			        , #{duration}
+		
+			 )
+		<selectKey resultType="int" keyProperty="conNumber" order="AFTER">
+        SELECT LAST_INSERT_ID()
+        </selectKey>
+	
+	</insert>
+	
+	<insert id="createContractProduct">
+		INSERT 
+		INTO   contractproduct
+		       (
+		            connumber
+				    , productid
+				    , producttype
+				    , packageid
+				    , packagepricereferenceyn
+				    , packagevarietyyn
+				    , quantity
+				    , effectstartdatetime
+				    , effectenddatetime
+				    , auditid
+				    , auditdatetime
+		     )
+			VALUES (
+					 #{conNumber}
+					, #{productId}
+			        , #{productType}
+			        , #{packageId}
+			        , #{packagePriceReferenceYn}
+			        , #{packageVarietyYn}
+			        , #{productQuantity}
+			        , #{effectStartDateTime}
+			        , #{effectEndDateTime}
+			        , 'TEST'
+			        , NOW()
+		
+			 )
+	
+	</insert>
+	
+	<insert id="createContractDiscount">
+		INSERT 
+		INTO   contractdiscount
+		       (
+		            connumber
+				    , discountid
+				    , discounttype
+				    , discountvalue
+				    , effectstartdatetime
+				    , effectenddatetime
+				    , auditid
+				    , auditdatetime				    
+			  )
+			VALUES (
+					 #{conNumber}
+					, #{discountId}
+			        , #{discountType}
+			        , #{discountValue}
+			        , #{effectStartDateTime}
+			        , #{effectEndDateTime}
+			        , 'TEST'
+			        , NOW()
+		
+			 )
+	
+	</insert>
+	
+	<select id="findSubscribeDateTime" resultType="ContractInsert" >
+    	<![CDATA[ 
+    	select subscribedatetime
+		from contract
+		where connumber = #{connumber}
+		
+		]]>    	
+    </select>
+	
+    <select id="findPackageId" resultType="ContractInsert" >
+    	<![CDATA[ 
+    	select packageid
+		from productpackage
+		where mainproductid = #{productId}
+		and lasthistoryyn ='Y'
+		limit 1 
+		]]>    	
+    </select>
+    
+    <select id="findContractProductByConNumberAndProductId" resultType="com.api.billing.model.contract.ContractProduct">
+		SELECT cp.connumber AS connumber
+		     , cp.productid AS productid
+		     , cp.producttype AS producttype
+		     , cp.packageid AS packageid
+		     , cp.packagepricereferenceyn AS packagepricereferenceyn
+		     , cp.packagevarietyyn AS packagevarietyyn
+		     , cp.quantity AS quantity
+		     , cp.effectstartdatetime AS effectstartdatetime
+		     , cp.effectenddatetime AS effectenddatetime
+		FROM   contractproduct cp
+		WHERE  cp.connumber = #{conNumber}
+		AND    cp.productid = #{productId}
+  </select>
+  
+  <select id="findAllProduct" resultMap="productResult" parameterType="com.api.billing.model.product.Product3">
+		SELECT p.productid AS productid
+		     , p.productname AS productname
+		FROM   product p
+		WHERE  p.producttype = 'PACKAGE'
+		AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN p.subscribestartdatetime AND p.subscribeenddatetime
+	</select>
+	
+	<select id="findAllDiscount" resultMap="discountResult" parameterType="com.api.billing.model.product.Discount">
+		SELECT d.discountid AS discountid
+		     , d.discountname AS discountname
+		FROM   discount d
+		WHERE  d.discounttype IN ('AMOUNT', 'RATE')
+		AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN d.subscribestartdatetime AND d.subscribeenddatetime
+	</select>
+	
+	
+	<select id="findCouponBalanceByCustomerNumber" resultMap="couponBalanceResult">
+		SELECT cb.providernumber
+		     , cb.customernumber
+		     , (SELECT cgd.codename
+		        FROM   codegroupdetail cgd
+		        WHERE  cgd.codegroupid = 'coupontype'
+		        AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+		        AND    cb.coupontype = cgd.code) AS coupontype 
+		     , cb.couponbalance
+		FROM   couponbalance cb
+		WHERE  cb.customernumber = #{customernumber}
+  </select>  
+
+  <select id="findCouponUseHistoryByCustomerNumber" resultMap="couponUseHistoryListResult">
+		SELECT   cuh.providernumber
+		       , cuh.customernumber
+				 , (SELECT cgd.codename
+				    FROM   codegroupdetail cgd
+				    WHERE  cgd.codegroupid = 'coupontype'
+				    AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				    AND    cuh.coupontype = cgd.code) AS coupontype
+		       , DATE_FORMAT(cuh.usedatetime, '%Y-%m-%d %H:%i:%s') AS usedatetime
+		       , (SELECT cgd.codename
+				    FROM   codegroupdetail cgd
+				    WHERE  cgd.codegroupid = 'couponusetype'
+				    AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				    AND    cuh.couponusetype = cgd.code) AS couponusetype 
+		       , cuh.useamount
+		       , cuh.usehistory
+		FROM     couponbalance cb
+		       , couponusehistory cuh
+		WHERE    cb.customernumber = #{customernumber}
+		AND      cb.providernumber = cuh.providernumber
+		AND      cb.customernumber = cuh.customernumber
+		ORDER BY cuh.providernumber
+		       , cuh.customernumber
+		       , cuh.usedatetime DESC
+  </select>
+  
+  <insert id="saveCouponUseHistory">
+		INSERT 
+		INTO   couponusehistory
+		       (
+		          providernumber
+				    , customernumber
+				    , coupontype
+				    , usedatetime
+				    , couponusetype
+				    , useamount
+				    , usehistory
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          #{providernumber}
+		        , #{customerNumber}
+		        , (SELECT cgd.code
+							FROM   codegroupdetail cgd
+							WHERE  cgd.codegroupid = 'coupontype'
+							AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+							AND    #{couponType} = cgd.codename)
+		        , DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')
+		        , #{couponUseType}
+		        , #{useAmount}
+		        , #{useHistory}
+		        , 'TEST'
+		        , NOW()
+		        )
+	</insert>
+	
+	<update id="saveCouponBalance">
+		UPDATE couponbalance cb
+		SET    cb.couponbalance = cb.couponbalance - #{couponBalance}
+			   , auditid = 'TEST'
+			   , auditdatetime = NOW()  
+		WHERE  providernumber = #{providernumber}
+		AND    customernumber = #{customerNumber}
+		AND    coupontype = (SELECT cgd.code
+												FROM   codegroupdetail cgd
+												WHERE  cgd.codegroupid = 'coupontype'
+												AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+												AND    #{couponType} = cgd.codename)
+	</update>
+  	
+  	
+  	<select id="findCouponBalanceWhenContractInsert" resultType="CouponBalance">
+		SELECT cb.providernumber
+		     , cb.customernumber
+		     , cb.coupontype
+		     , cb.couponbalance
+		FROM   couponbalance cb
+		WHERE  cb.customernumber = #{customerNumber}
+		AND    cb.providernumber = #{providernumber}
+		AND    cb.coupontype = (SELECT cgd.code
+								FROM   codegroupdetail cgd
+								WHERE  cgd.codegroupid = 'coupontype'
+								AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+								AND    #{productType} = cgd.code)
+  	</select> 
+  	
+  	<update id="updateCouponBalanceWhenContarctInsert">
+		UPDATE couponbalance cb
+		SET    cb.couponbalance = #{couponBalance}
+			   , auditid = 'TEST'
+			   , auditdatetime = NOW()  
+		WHERE  providernumber = #{providernumber}
+		AND    customernumber = #{customerNumber}
+		AND    coupontype = (SELECT cgd.code
+								FROM   codegroupdetail cgd
+								WHERE  cgd.codegroupid = 'coupontype'
+								AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+								AND    #{couponType} = cgd.code)
+	</update>
+    
+    <insert id="createCouponBalanceWhenContractInsert">
+		INSERT 
+		INTO   couponbalance
+		       (
+		          providernumber
+				    , customernumber
+				    , coupontype
+				    , couponbalance
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          #{providernumber}
+		        , #{customerNumber}
+		        , #{couponType}
+		        , #{couponBalance}
+		        , 'TEST'
+		        , NOW()
+		        )
+	</insert>
+	
+	<insert id="createCouponUseHIstoryWhenConatractInsert">
+		INSERT 
+		INTO   couponusehistory
+		       (
+		          providernumber
+				    , customernumber
+				    , coupontype
+				    , usedatetime
+				    , couponusetype
+				    , useamount
+				    , usehistory
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          #{providernumber}
+		        , #{customerNumber}
+		        , (SELECT cgd.code
+							FROM   codegroupdetail cgd
+							WHERE  cgd.codegroupid = 'coupontype'
+							AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+							AND    #{couponType} = cgd.code)
+		        , DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')
+		        , #{couponUseType}
+		        , #{useAmount}
+		        , #{useHistory}
+		        , 'TEST'
+		        , NOW()
+		        )
+	</insert>
+    
+    
+</mapper>

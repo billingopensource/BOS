@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.api.repository.DeliveryRepository">
+
+  <select id="getDeliveryByDate" resultType="Delivery"  parameterType = "DeliveryDateInput">
+    select dd.deliverynumber
+       ,date_format(dd.deliverydate, '%Y-%m-%d') deliverydate        
+       ,ad.zipcode
+       ,cu.customername
+       ,pr.productname
+       ,cu.phonenumber
+       ,CONCAT('(', ad.zipcode, ')  ', ad.baseaddress,'  ', ad.detailaddress) addr
+       ,cp.packageid
+    from deliverydetail dd
+         ,customer cu
+         ,contract ct
+         ,contractproduct cp
+         ,product pr
+         ,paymentinformation pa
+         ,address ad
+   where dd.deliverydate between replace(#{fromDateD},'-','')  and replace(#{toDateD},'-','') 
+   and dd.customernumber = cu.customernumber
+   and   dd.connumber = ct.connumber
+   and   dd.connumber = cp.connumber
+   and   cp.productid = pr.productid
+   and   ct.paymentinformationnumber = pa.paymentinformationnumber
+   and   pa.deliveryaddressid = ad.addressid
+   and   dd.providernumber = #{providernumber}
+	order by 2,3, 4, 5 
+	LIMIT #{pageStart}, #{perPageNum}
+    </select>
+
+
+    <select id="getDeliveryTotCount" resultType="int"  parameterType = "DeliveryDateInput" >
+    select count(*)
+    from deliverydetail dd
+         ,customer cu
+         ,contract ct
+         ,contractproduct cp
+         ,product pr
+         ,paymentinformation pa
+         ,address ad
+   where dd.deliverydate between replace(#{fromDateD},'-','')  and replace(#{toDateD},'-','') 
+   and dd.customernumber = cu.customernumber
+   and   dd.connumber = ct.connumber
+   and   dd.connumber = cp.connumber
+   and   cp.productid = pr.productid
+   and   ct.paymentinformationnumber = pa.paymentinformationnumber
+   and   dd.providernumber = #{providernumber}
+   and   pa.deliveryaddressid = ad.addressid
+	order by 1	
+    </select>
+
+
+  <select id="getPackage" resultType="Package"  parameterType = "DeliveryPackageInput">
+  select pkg.compositionproductid  compositionProductId 
+        ,prd.productname           compositionProductName
+        ,prd.priceamount           priceAmount        
+        ,date_format(pkg.effectstartdatetime, '%Y-%m-%d') stdt
+        ,date_format(pkg.effectenddatetime, '%Y-%m-%d') eddt
+   from productpackage pkg
+        ,product prd
+  where pkg.packageid = #{packageid}
+    and pkg.effectstartdatetime <![CDATA[<=]]> replace(#{deliverydate},'-','')    
+    and pkg.effectenddatetime <![CDATA[>=]]> replace(#{deliverydate},'-','')
+    and pkg.compositionproductid = prd.productid
+    and pkg.providernumber = #{providernumber}
+    and prd.providernumber = #{providernumber}
+	LIMIT #{pageStart}, #{perPageNum}
+    </select>
+
+
+    <select id="getPackageTotalCount" resultType="int"  parameterType = "DeliveryPackageInput" >
+  select  count(*)
+  from productpackage pkg
+     ,product prd
+  where pkg.packageid = #{packageid}
+    and pkg.effectstartdatetime <![CDATA[<=]]> replace(#{deliverydate},'-','')    
+    and pkg.effectenddatetime <![CDATA[>=]]> replace(#{deliverydate},'-','')
+    and pkg.compositionproductid = prd.productid
+    and pkg.providernumber = #{providernumber}
+    and prd.providernumber = #{providernumber}
+    </select>
+
+
+
+ 	<insert id="insertDeliveryDetail">
+    INSERT 
+	  INTO deliverydetail 
+	    (
+	     connumber
+	    ,customernumber
+	    ,providernumber
+	    ,invoicenumber
+	    ,invoicedate
+	    ,deliverydate
+	    ,deliverystate
+	    ,deliverydatetime
+	    ,deliveryremark
+	    ,auditid
+	    ,auditdatetime
+	    )
+	select  i.connumber
+	       ,i.customernumber
+	       ,i.providernumber
+	       ,i.invoicenumber
+	       ,i.invoicedate
+	       ,case when (i.collectionbalanceamount = 0 ) then i.invoicedate else now() end
+	       ,'WAITING'
+	       ,NULL    
+		   ,NULL    
+		   ,i.auditid
+		   ,NOW()
+		from invoice i
+		where i.invoicenumber = #{invoicenumber} 
+		and i.invoicedate =  replace(#{invoicedate},'-','')
+	</insert>
+
+
+  
+</mapper>

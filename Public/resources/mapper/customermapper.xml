@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.api.repository.CustomerRepository">
+	
+	<resultMap id="customerResult" type="com.api.billing.model.customer.Customer"> 
+		<result property="customerNumber" column="customernumber"/>
+		<result property="customerName" column="customername"/> 
+		<result property="providernumber" column="providernumber"/>
+		<result property="sex" column="sex"/>
+		<result property="birthday" column="birthday"/>
+		<result property="email" column="email"/>
+		<result property="phoneNumber" column="phonenumber"/>
+		<result property="addressId" column="addressid"/>
+		<result property="deliveryAddressId" column="deliveryaddressid"/>
+		<result property="customerType" column="customertype"/>
+		<result property="createDate" column="createdate"/>
+		<result property="currentDate" column="currentdate"/>
+		<result property="deleteDate" column="deletedate"/>
+		<result property="zipcode" column="zipcode"/>
+		<result property="baseAddress" column="baseaddress"/>
+		<result property="detailAddress" column="detailaddress"/>
+	</resultMap>
+	
+	<resultMap id="productResult" type="com.api.billing.model.contract.Product">
+		<result property="customerNumber" column="customernumber"/>
+    <result property="conNumber" column="connumber"/>
+    <result property="productName" column="productname"/>
+    <result property="productType" column="producttype"/>
+    <result property="priceAmount" column="priceamount"/>
+    <result property="effectStartDateTime" column="effectstartdatetime"/>
+    <result property="effectEndDateTime" column="effectenddatetime"/>
+    <result property="duration" column="duration"/>
+    <result property="remainDuration" column="remainduration"/>
+    <result property="recurringInvoiceYn" column="recurringinvoiceyn"/>
+    <result property="deliveryCycle" column="deliverycycle"/>
+    <result property="invoiceCycle" column="invoicecycle"/>
+    <result property="contractState" column="contractstate"/>
+	</resultMap>
+	
+	<resultMap id="counsellingHistoryResult" type="com.api.billing.model.customer.CounsellingHistory"> 
+		<result property="customerNumber" column="customernumber"/> 
+		<result property="counsellingDate" column="counsellingdate"/> 
+		<result property="counsellingTime" column="counsellingtime"/>
+		<result property="category" column="category"/>
+		<result property="memo" column="memo"/>
+		<result property="createUser" column="createuser"/>
+		<result property="auditId" column="auditid"/>
+		<result property="auditDateTime" column="auditdatetime"/>		
+	</resultMap>
+	
+	<resultMap id="customerCharacteristicResult" type="com.api.billing.model.customer.CustomerCharacteristic"> 
+		<result property="customerNumber" column="customernumber"/> 
+		<result property="createDate" column="createdate"/>
+		<result property="createTime" column="createtime"/>
+		<result property="characteristic" column="characteristic"/>
+		<result property="memo" column="memo"/>
+		<result property="createUser" column=""/>
+		<result property="auditId" column="createuser"/>
+		<result property="auditDateTime" column="auditdatetime"/>		
+	</resultMap>
+	
+	<resultMap id="addressResult" type="com.api.billing.model.customer.Address" >
+		<result property="addressId" column="addressid"/>
+		<result property="zipcode" column="zipcode"/>
+		<result property="baseAddress" column="baseaddress"/>
+		<result property="detailAddress" column="detailaddress"/>
+		<result property="auditId" column="auditid"/>
+		<result property="auditDateTime" column="auditdatetime"/>
+	</resultMap>
+
+	<select id="findAll" resultMap="customerResult">
+	  SELECT   c.customernumber AS customernumber
+           , c.customername AS customername
+           , c.providernumber AS providernumber
+           , (SELECT cgd.codename
+       			  FROM   codegroupdetail cgd
+			        WHERE  cgd.codegroupid = 'SEXTYPE'
+			        AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				      AND    c.sex = cgd.code) AS sex
+           , c.birthday AS birthday
+           , c.email AS email
+           , c.phonenumber AS phonenumber
+           , c.deliveryaddressid AS deliveryaddressid
+           , (SELECT cgd.codename
+       			  FROM   codegroupdetail cgd
+			        WHERE  cgd.codegroupid = 'CUSTOMERTYPE'
+			        AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				      AND    c.customertype = cgd.code) AS customertype
+           , c.createdate AS createdate
+           , c.currentdate AS currentdate
+           , c.deletedate AS deletedate
+           , a.addressid AS addressid
+           , a.zipcode AS zipcode
+           , a.baseaddress AS baseaddress
+           , a.detailaddress AS detailaddress
+	  FROM     customer c
+	  JOIN     address a
+	  ON       c.addressid = a.addressid
+	  where  c.providernumber = #{param3}
+    ORDER BY c.customernumber
+	  LIMIT    #{param1}, #{param2}
+	</select>
+	
+	<select id="findAllTotalCount" resultType="int">
+	  SELECT   COUNT(*)   
+	  FROM     customer c
+	  JOIN     address a
+	  ON       c.addressid = a.addressid
+	  where   c.providernumber = #{param1}
+	</select>
+	
+	<select id="findCustomerByCustomerNumber" resultMap="customerResult">
+	  SELECT c.customernumber AS customernumber
+         , c.customername AS customername
+         , c.providernumber AS providernumber
+         , (SELECT cgd.codename
+       		  FROM   codegroupdetail cgd
+			      WHERE  cgd.codegroupid = 'SEXTYPE'
+			      AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				    AND    c.sex = cgd.code) AS sex
+         , c.birthday AS birthday
+         , c.email AS email
+         , c.phonenumber AS phonenumber
+         , c.deliveryaddressid AS deliveryaddressid
+         , (SELECT cgd.codename
+       			FROM   codegroupdetail cgd
+			      WHERE  cgd.codegroupid = 'CUSTOMERTYPE'
+			      AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				    AND    c.customertype = cgd.code) AS customertype
+         , CONCAT(SUBSTR(c.createdate, 1, 4), '-', SUBSTR(c.createdate, 5, 2), '-', SUBSTR(c.createdate, 7, 2)) AS createdate
+         , CONCAT(SUBSTR(c.currentdate, 1, 4), '-', SUBSTR(c.currentdate, 5, 2), '-', SUBSTR(c.currentdate, 7, 2)) AS currentdate
+         , CONCAT(SUBSTR(c.deletedate, 1, 4), '-', SUBSTR(c.deletedate, 5, 2), '-', SUBSTR(c.deletedate, 7, 2)) AS deletedate
+         , a.addressid AS addressid
+         , a.zipcode AS zipcode
+         , a.baseaddress AS baseaddress
+         , a.detailaddress AS detailaddress
+	  FROM   customer c
+	  JOIN   address a
+	  ON     c.addressid = a.addressid
+	  WHERE  customernumber = #{customerNumber}
+	</select>
+	
+	<select id="findProductByCustomerNumber" resultMap="productResult">
+		SELECT  co.customernumber AS customernumber 
+			  , co.connumber AS connumber
+			  , (SELECT cgd.codename
+				 FROM   codegroupdetail cgd
+				 WHERE  cgd.codegroupid = 'CONTRACTSTATE'
+				 AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				 AND    co.contractstate = cgd.code) AS contractstate
+			  , p.productname AS productname
+			  , (SELECT cgd.codename
+				 FROM   codegroupdetail cgd
+				 WHERE  cgd.codegroupid = 'PRODUCTTYPE'
+				 AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				 AND    p.producttype = cgd.code) AS producttype
+			  , CONCAT(SUBSTR(co.effectstartdatetime, 1, 4), '-', SUBSTR(co.effectstartdatetime, 5, 2), '-', SUBSTR(co.effectstartdatetime, 7, 2)) AS effectstartdatetime
+			  , CONCAT(SUBSTR(co.effectenddatetime, 1, 4), '-', SUBSTR(co.effectenddatetime, 5, 2), '-', SUBSTR(co.effectenddatetime, 7, 2)) AS effectenddatetime
+			  , co.duration AS duration
+			  , TIMESTAMPDIFF(MONTH, DATE_FORMAT(NOW(), '%Y%m%d'), co.effectenddatetime) AS remainduration
+			  , CASE WHEN p.packagepricereferenceyn = 'Y' THEN p.packagepricebandwidth
+					 WHEN p.packagepricereferenceyn = 'N' THEN FORMAT(p.priceamount , 0)
+					 ELSE FORMAT(p.priceamount , 0)
+			    END AS priceamount
+			  , (SELECT cgd.codename
+				 FROM   codegroupdetail cgd
+				 WHERE  cgd.codegroupid = 'RECURRINGINVOICEYN'
+				 AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				 AND    co.recurringinvoiceyn = cgd.code) AS recurringinvoiceyn 
+			  , (SELECT cgd.codename
+				 FROM   codegroupdetail cgd
+				 WHERE  cgd.codegroupid = 'DELIVERYCYCLE'
+				 AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+		         AND    co.deliverycycle = cgd.code) AS deliverycycle
+			  , (SELECT cgd.codename
+				 FROM   codegroupdetail cgd
+				 WHERE  cgd.codegroupid = 'invoicecycle'
+				 AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+				 AND    co.invoicecycle = cgd.code) AS invoicecycle
+		FROM     contract co
+		JOIN     contractproduct cp
+		ON       co.connumber = cp.connumber
+		JOIN     product p
+		ON       cp.productid = p.productid
+		WHERE    co.customernumber = #{customerNumber}
+		ORDER BY co.contractstate
+			    , co.effectstartdatetime
+			    , co.effectenddatetime
+	</select>
+	
+	<select id="findCustomerBySearchBar" resultType="Customer" parameterType="CustomerSearchBar">
+	  SELECT c.customernumber AS customernumber
+         , c.customername AS customername
+         , c.providernumber AS providernumber
+         , c.sex AS sex 
+         , c.birthday AS birthday
+         , c.email AS email
+         , c.phonenumber AS phonenumber
+         , c.deliveryaddressid AS deliveryaddressid
+         , c.customertype AS customertype
+         , c.createdate AS createdate
+         , c.currentdate AS currentdate
+         , c.deletedate AS deletedate
+         , a.addressid AS addressid
+         , a.zipcode AS zipcode
+         , a.baseaddress AS baseaddress
+         , a.detailaddress AS detailaddress
+	  FROM   customer c
+	  JOIN   address a
+	  ON     c.addressid = a.addressid
+	  WHERE  c.customername LIKE CONCAT('%', #{customerName}, '%')
+	  AND    c.phonenumber LIKE CONCAT('%', #{phoneNumber}, '%')
+	  and    c.providernumber = #{providernumber}
+	  LIMIT  #{pageStart}, #{perPageNum}
+	</select>
+	
+	<select id="findCustomerBySearchBarTotalCount" resultType="int" parameterType="CustomerSearchBar">
+	  SELECT COUNT(*)   
+	  FROM   customer c
+	  JOIN   address a
+	  ON     c.addressid = a.addressid
+	  WHERE  c.customername LIKE CONCAT('%', #{customerName}, '%')
+	  AND    c.phonenumber LIKE CONCAT('%', #{phoneNumber}, '%')
+	  and    c.providernumber = #{providernumber}
+	  LIMIT  #{pageStart}, #{perPageNum}
+	</select>
+	
+	<select id="findAddressId" resultMap="addressResult">
+		SELECT CONCAT('ADD',NEXTVAL(addressid_seq)) as addressid
+	</select>
+	
+	<insert id="saveAddress">
+		INSERT 
+		INTO   address
+		       (
+		          addressid
+				    , zipcode
+				    , baseaddress
+				    , detailaddress
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          #{addressId}
+		        , #{zipcode}
+		        , #{baseAddress}
+		        , #{detailAddress}
+		        , 'TEST'
+		        , NOW()
+		        )
+	</insert>
+	
+  <update id="saveAddressUpdate">
+		UPDATE address 
+		SET    zipcode = #{zipcode}
+			   , baseaddress = #{baseAddress}
+			   , detailaddress = #{detailAddress}
+			   , auditid = 'TEST'
+			   , auditdatetime = NOW()  
+		WHERE  addressid = #{addressId}
+  </update>
+	
+	<insert id="saveCustomer" useGeneratedKeys="true" keyProperty="customernumber">
+		INSERT 
+		INTO   customer
+		       (
+		          customername
+				    , providernumber
+				    , sex
+				    , birthday
+				    , email
+				    , phonenumber
+				    , addressid
+				    , deliveryaddressid
+				    , customertype
+				    , createdate
+				    , currentdate
+				    , deletedate
+				    , auditid
+				    , auditdatetime
+				    )
+		VALUES (
+		          #{customerName}
+		        , #{providernumber}
+		        , #{sex}
+		        , #{birthday}
+		        , #{email}
+		        , #{phoneNumber}
+		        , #{addressId}
+		        , ''
+		        , #{customerType}
+		        , DATE_FORMAT(NOW(), '%Y%m%d')
+		        , ''
+		        , ''
+		        , 'TEST'
+		        , NOW()
+		        )
+		<selectKey resultType="int" keyProperty="customerNumber" order="AFTER">
+      SELECT LAST_INSERT_ID()
+    </selectKey>			        
+	</insert>
+
+  <update id="saveCustomerUpdate">
+		UPDATE customer 
+		SET    customername = #{customerName}
+		     , sex = #{sex}
+			   , birthday = #{birthday}
+			   , email = #{email}
+			   , phonenumber = #{phoneNumber}
+			   , addressid = #{addressId}
+			   , deliveryaddressid = ''
+			   , currentdate = DATE_FORMAT(NOW(), '%Y%m%d')
+			   , auditid = 'TEST'
+			   , auditdatetime = NOW()  
+		WHERE  customernumber = #{customerNumber}
+  </update>
+  
+  <select id="findCounsellingHistorySummaryByCustomerNumber" resultMap="counsellingHistoryResult">
+		<![CDATA[
+      SELECT ch.customernumber AS customernumber
+           , ch.counsellingdate AS counsellingdate
+           , ch.counsellingtime AS counsellingtime
+           , ch.category AS category
+           , ch.inboundpath AS inboundpath
+           , ch.memo AS memo
+           , ch.createuser AS createuser
+      FROM  (
+             SELECT    ch.customernumber
+                     , CONCAT(SUBSTR(ch.counsellingdate, 1, 4), '-', SUBSTR(ch.counsellingdate, 5, 2), '-', SUBSTR(ch.counsellingdate, 7, 2)) AS counsellingdate
+                     , CONCAT(SUBSTR(ch.counsellingtime, 1, 2), ':', SUBSTR(ch.counsellingtime, 3, 2), ':', SUBSTR(ch.counsellingtime, 5, 2)) AS counsellingtime
+                     , (SELECT cgd.codename
+			       		        FROM   codegroupdetail cgd
+						            WHERE  cgd.codegroupid = 'CATEGORY'
+						            AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+							          AND    ch.category = cgd.code) AS category
+                     , (SELECT cgd.codename
+			       		        FROM   codegroupdetail cgd
+						            WHERE  cgd.codegroupid = 'INBOUNDPATH'
+						            AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+							          AND    ch.inboundpath = cgd.code) AS inboundpath
+                     , ch.memo
+                     , ch.createuser
+                     , @ROWNUM := @ROWNUM+1 AS rownum
+              FROM     counsellinghistory ch
+                     , (SELECT @ROWNUM :=0) AS rn
+              WHERE    ch.customernumber = #{customerNumber}
+              ORDER BY ch.customernumber
+                     , ch.counsellingdate DESC
+                     , ch.counsellingtime DESC
+             ) ch
+      WHERE  rownum <= 3
+		]]>
+	</select>
+	
+  <select id="findCounsellingHistoryByCustomerNumber" resultMap="counsellingHistoryResult">
+		<![CDATA[
+      SELECT ch.customernumber AS customernumber
+           , ch.counsellingdate AS counsellingdate
+           , ch.counsellingtime AS counsellingtime
+           , ch.category AS category
+           , ch.inboundpath AS inboundpath
+           , ch.memo AS memo
+           , ch.createuser AS createuser
+      FROM  (
+             SELECT    ch.customernumber
+                     , CONCAT(SUBSTR(ch.counsellingdate, 1, 4), '-', SUBSTR(ch.counsellingdate, 5, 2), '-', SUBSTR(ch.counsellingdate, 7, 2)) AS counsellingdate
+                     , CONCAT(SUBSTR(ch.counsellingtime, 1, 2), ':', SUBSTR(ch.counsellingtime, 3, 2), ':', SUBSTR(ch.counsellingtime, 5, 2)) AS counsellingtime
+                     , (SELECT cgd.codename
+			       		        FROM   codegroupdetail cgd
+						            WHERE  cgd.codegroupid = 'CATEGORY'
+						            AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+							          AND    ch.category = cgd.code) AS category
+                     , (SELECT cgd.codename
+			       		        FROM   codegroupdetail cgd
+						            WHERE  cgd.codegroupid = 'INBOUNDPATH'
+						            AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+							          AND    ch.inboundpath = cgd.code) AS inboundpath
+                     , ch.memo
+                     , ch.createuser
+                     , @ROWNUM := @ROWNUM+1 AS rownum
+              FROM     counsellinghistory ch
+                     , (SELECT @ROWNUM :=0) AS rn
+              WHERE    ch.customernumber = #{customerNumber}
+              ORDER BY ch.customernumber
+                     , ch.counsellingdate DESC
+                     , ch.counsellingtime DESC
+             ) ch
+		]]>
+	</select>
+	
+	<select id="findCustomerCharacteristicByCustomerNumber" resultMap="customerCharacteristicResult">
+		SELECT cc.customernumber
+		     , cc.createdate
+		     , cc.createtime
+		     , cc.characteristic
+		     , cc.memo
+		     , cc.createuser
+		FROM  (
+		       SELECT    cc.customernumber
+		               , CONCAT(SUBSTR(cc.createdate, 1, 4), '-', SUBSTR(cc.createdate, 5, 2), '-', SUBSTR(cc.createdate, 7, 2)) AS createdate
+                   , CONCAT(SUBSTR(cc.createtime, 1, 2), ':', SUBSTR(cc.createtime, 3, 2), ':', SUBSTR(cc.createtime, 5, 2)) AS createtime
+		               , (SELECT cgd.codename
+			       		      FROM   codegroupdetail cgd
+						          WHERE  cgd.codegroupid = 'CHARACTERISTIC'
+						          AND    DATE_FORMAT(NOW(), '%Y%m%d') BETWEEN cgd.effectstartdatetime AND cgd.effectenddatetime
+							        AND    cc.characteristic = cgd.code) AS characteristic
+		               , cc.memo
+		               , cc.createuser
+		               , @ROWNUM := @ROWNUM+1 AS rownum
+		        FROM     customercharacteristic cc
+		               , (SELECT @ROWNUM :=0) AS rn
+		        WHERE    cc.customernumber = #{customerNumber}
+		        ORDER BY cc.customernumber
+		               , cc.createdate DESC
+		               , cc.createtime DESC
+		      ) cc
+		WHERE rownum = 1
+	</select>
+
+	<insert id="saveCustomerCharacteristic">
+		INSERT 
+		INTO   customercharacteristic
+		       (
+		          customernumber
+				    , createdate
+				    , createtime
+				    , characteristic
+				    , memo
+				    , createuser
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          #{customerNumber}
+		        , DATE_FORMAT(NOW(), '%Y%m%d')
+		        , DATE_FORMAT(NOW(), '%H%i%s')
+		        , #{characteristic}
+		        , #{memo}
+		        , 'TEST'
+		        , 'TEST'
+		        , NOW()
+		        )
+	</insert>
+	
+	<insert id="saveCounsellingHistory">
+		INSERT 
+		INTO   counsellinghistory
+		       (
+		          customernumber
+				    , counsellingdate
+				    , counsellingtime
+				    , category
+				    , inboundpath
+				    , memo
+				    , createuser
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          #{customerNumber}
+		        , DATE_FORMAT(NOW(), '%Y%m%d')
+		        , DATE_FORMAT(NOW(), '%H%i%s')
+		        , #{category}
+		        , #{inboundPath}
+		        , #{memo}
+		        , 'TEST'
+		        , 'TEST'
+		        , NOW()
+		        )
+	</insert>
+	
+	<select id="findCustomerByCustomerNameAndBirthdayAndPhoneNumber" resultMap="customerResult" parameterType="com.api.billing.model.customer.Customer">
+		SELECT c.customernumber AS customernumber
+		     , c.customername AS customername
+		     , c.providernumber AS providernumber
+		     , c.sex AS sex
+		     , c.birthday AS birthday
+		     , c.email AS email
+		     , c.phonenumber AS phonenumber
+		     , c.addressid AS addressid
+		     , c.deliveryaddressid AS deliveryaddressid
+		     , c.customertype AS customertype
+		     , c.createdate AS createdate
+		     , c.currentdate AS currentdate
+		     , c.deletedate AS deletedate
+		FROM   customer c
+		WHERE  c.customername = #{customerName}
+		AND    c.birthday = #{birthday}
+		AND    c.phonenumber = #{phoneNumber}
+		and    c.providernumber = #{providernumber}
+	</select>
+	
+</mapper>

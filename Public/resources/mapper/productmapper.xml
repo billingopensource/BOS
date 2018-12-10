@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.api.repository.ProductRepository">
+	
+	<resultMap id="productResult" type="com.api.billing.model.product.Product3"> 
+		<result property="productId" column="productid"/>
+		<result property="productName" column="productname"/> 
+		<result property="providerNumber" column="providernumber"/>
+		<result property="productType" column="producttype"/>
+		<result property="productState" column="productstate"/>
+		<result property="subscribeStartDateTime" column="subscribestartdatetime"/>
+		<result property="subscribeEndDateTime" column="subscribeenddatetime"/>
+		<result property="recurringDeleveryYn" column="recurringdeliveryyn"/>
+		<result property="priceAmount" column="priceamount"/>
+		<result property="taxObjectYn" column="taxobjectyn"/>
+		<result property="packageYn" column="packageyn"/>
+		<result property="packagePriceReferenceYn" column="packagepricereferenceyn"/>
+		<result property="packageVarietyYn" column="packagevarietyyn"/>
+		<result property="packagePriceBandwidth" column="packagepricebandwidth"/>
+		<result property="productDescription" column="productdescription"/>
+		<result property="beforeProductId" column="beforeproductid"/>
+		<result property="suspendPriceAmount" column="suspendpriceamount"/>
+		<result property="exposureYn" column="exposureyn"/>
+		<result property="lastChangeDateTime" column="lastchangedatetime"/>	
+	</resultMap>
+	
+	<resultMap id="discountResult" type="com.api.billing.model.product.Discount"> 
+		<result property="discountId" column="discountid"/>
+		<result property="discountName" column="discountname"/> 
+		<result property="providerNumber" column="providernumber"/>
+		<result property="discountType" column="discounttype"/>
+		<result property="discountState" column="discountstate"/>
+		<result property="subscribeStartDateTime" column="subscribestartdatetime"/>
+		<result property="subscribeEndDateTime" column="subscribeenddatetime"/>
+		<result property="discountValue" column="discountvalue"/>
+		<result property="discountOrder" column="discountorder"/>
+		<result property="discountDescription" column="discountdescription"/>
+		<result property="beforeDiscountId" column="beforediscountid"/>
+		<result property="exposureYn" column="exposureyn"/>
+		<result property="lastChangeDateTime" column="lastchangedatetime"/>
+		<result property="discountType2" column="discounttype2"/>
+	 	<result property="discountType2Value" column="discounttype2value"/>
+		<result property="auditId" column="auditid"/>
+		<result property="auditDateTime" column="auditdatetime"/>
+	</resultMap>
+	
+	<resultMap id="productPackageResult" type="com.api.billing.model.product.ProductPackage"> 
+		<result property="packageId" column="packageid"/>
+	    <result property="providerNumber" column="providernumber"/>
+	    <result property="mainProductId" column="mainproductid"/>
+	    <result property="compositionProductId" column="compositionproductid"/>
+	    <result property="effectStartDateTime" column="effectstartdatetime"/>
+	    <result property="effectEndDateTime" column="effectenddatetime"/>
+	    <result property="lastHistoryYn" column="lasthistoryyn"/>
+	</resultMap>
+	
+	<select id="getProductlist" resultType="Product3"  parameterType = "ProductInput">
+
+				select  pro.productid   		  productId
+					,pro.productname		      productName
+					,pro.providernumber		      providerNumber
+					,code2.codename  		      productType
+					,code1.codename  		      productState
+					,DATE_FORMAT(pro.subscribestartdatetime , '%Y-%m-%d' ) subscribeStartDateTime
+					,DATE_FORMAT(pro.subscribeenddatetime , '%Y-%m-%d' ) subscribeEndDateTime
+					,IFNULL(pro.recurringdeliveryyn, '')   	  recurringDeleveryYn
+					,IFNULL(pro.taxobjectyn, '')              taxObjectYn
+					,IFNULL(pro.packageyn  , '')               packageYn
+					,CASE 
+				 		WHEN pro.packagepricereferenceyn = 'Y' THEN '종량형'
+					 	WHEN pro.packagepricereferenceyn = 'N' THEN '정액형'
+					 ELSE IFNULL(pro.packagepricereferenceyn ,'')
+					 END packagePriceReferenceYn
+					,IFNULL(pro.packagevarietyyn   ,'')      packageVarietyYn
+					,CASE 
+				 		WHEN pro.packagepricereferenceyn = 'Y' THEN concat(pro.packagepricebandwidth,'원')
+					 	WHEN pro.packagepricereferenceyn = 'N' THEN concat(FORMAT(pro.priceamount,0),'원')
+					 ELSE concat(FORMAT(pro.priceamount, 0),'원')
+					 END AS priceAmount
+					,IFNULL(pro.productdescription  ,'')     productDescription
+					,IFNULL(pro.beforeproductid ,'')         beforeProductId
+					,IFNULL(pro.suspendpriceamount ,'')      suspendPriceAmount
+					,pro.exposureyn               exposureYn
+					,IFNULL(pro.lastchangedatetime ,'')		  lastChangeDateTime
+			from product pro
+			     ,codegroupdetail code1 
+			     ,codegroupdetail code2
+			where  pro.producttype like concat('%',#{productType},'%')
+			 and   pro.productname like concat('%',#{productName},'%')
+			 and   pro.exposureyn ='Y'
+			 and   code1.codegroupid ='PRODUCTSTATE'
+			 and   code1.code = pro.productstate
+			 and   code2.codegroupid ='PRODUCTTYPE'
+			 and   code2.code = pro.producttype
+			 and   pro.providernumber = #{providernumber}
+			 order by 4 desc
+			 LIMIT #{pageStart}, #{perPageNum}
+    </select>
+
+    
+    <select id="getProductselectlist" resultType="Product3" parameterType = "ProductInput" >
+				select  pro.productid   		  productId
+					,pro.productname		      productName
+			from product pro
+			where pro.producttype = 'NORMAL'
+			and   pro.providernumber = #{providernumber}
+			order by productName
+    </select>
+
+    
+    <select id="getProductPackagelist" resultType="ProductPackage"  parameterType = "ProductPackageInput">
+			select 	pkg.packageid
+			       	,pkg.mainproductid
+			       	,prd2.productname packagename		 
+			       	,pkg.compositionproductid
+			       	,prd1.productname compositionproductname
+			       	<!-- ,prd1.priceamount priceamount -->
+			       	,concat(FORMAT(prd1.priceamount, 0),'원')  priceamount
+					,DATE_FORMAT(pkg.effectstartdatetime , '%Y-%m-%d' ) effectstartdatetime
+					,DATE_FORMAT(pkg.effectenddatetime , '%Y-%m-%d' ) effectenddatetime
+			       	,IFNULL(pkg.lasthistoryyn , '') lasthistoryyn
+			from productpackage pkg
+			     ,product prd1
+			     ,product prd2
+			where pkg.mainproductid = #{mainProductId} -- 'PRD0000010'
+			and  pkg.compositionproductid = prd1.productid
+			and  pkg.mainproductid = prd2.productid
+			order by lasthistoryyn desc, effectenddatetime desc, effectstartdatetime desc, compositionproductid 
+    </select>  
+        
+    
+	<select id="findProductid" resultMap="productResult">
+ 		SELECT CONCAT('PRD',NEXTVAL(productid_seq)) as productid
+ 	</select>
+ 	
+ 	
+ 	<insert id="saveProduct">
+		INSERT 
+		INTO product
+			 (
+			 productid
+			 ,producttype
+			 ,packageyn
+			 ,productname
+			 ,subscribestartdatetime
+			 ,subscribeenddatetime
+			 ,recurringdeliveryyn
+			 ,priceamount
+			 ,taxobjectyn
+			 ,packagepricereferenceyn
+			 ,packagepricebandwidth
+			 ,packagevarietyyn
+			 ,productdescription
+			 ,suspendPriceAmount			 
+			 ,exposureyn 
+			 ,providerNumber
+			 ,productstate
+			 )
+		VALUES(
+				#{productId}
+				,#{productType}
+				,#{packageYn}
+				,#{productName}
+				,replace(#{subscribeStartDateTime},'-','')
+				,replace(#{subscribeEndDateTime},'-','')
+				,'Y'						<!-- #{recurringDeleveryYn} -->
+				,#{priceAmount}
+				,'Y'						<!-- #{taxObjectYn} -->
+				,#{packagePriceReferenceYn}
+				,#{packagePriceBandwidth}
+				,#{packageVarietyYn}
+				,#{productDescription}
+				,#{suspendPriceAmount}
+				,'Y'						<!-- #{exposureYn} --> 
+				,#{providernumber} 					<!-- #{providerNumber} -->
+				,'OPERATION'				<!-- #{productstate} -->
+				)
+	</insert>
+    
+    
+     <select id="findProductInfoByProductId" resultType="Product3" parameterType= "String">
+		select  pro.productid   		productId
+				,pro.productname		productName
+				,code2.codename			productType					
+				,DATE_FORMAT(pro.subscribestartdatetime , '%Y-%m-%d' ) subscribeStartDateTime
+				,DATE_FORMAT(pro.subscribeenddatetime , '%Y-%m-%d' ) subscribeEndDateTime				
+				,IFNULL(pro.recurringdeliveryyn, '')   	  recurringDeleveryYn
+				<!-- ,IFNULL(pro.priceamount, '')              priceAmount -->
+				,CASE 
+				 		WHEN pro.packagepricereferenceyn = 'Y' THEN pro.packagepricebandwidth
+					 	WHEN pro.packagepricereferenceyn = 'N' THEN concat(FORMAT(pro.priceamount,0),'원')
+					 ELSE concat(FORMAT(pro.priceamount, 0),'원')
+				 END AS priceAmount
+				,IFNULL(pro.taxobjectyn, '')              taxObjectYn
+				<!-- ,IFNULL(pro.packagepricereferenceyn ,'')  packagePriceReferenceYn -->
+				,CASE 
+				 		WHEN pro.packagepricereferenceyn = 'Y' THEN '종량형'
+					 	WHEN pro.packagepricereferenceyn = 'N' THEN '정액형'
+					 ELSE IFNULL(pro.packagepricereferenceyn ,'')
+					 END packagePriceReferenceYn
+				,IFNULL(pro.packagepricebandwidth ,'')    packagePriceBandwidth					
+				,IFNULL(pro.packagevarietyyn   ,'')      packageVarietyYn
+				,IFNULL(pro.productdescription  ,'')     productDescription
+				,IFNULL(pro.suspendpriceamount ,'')      suspendPriceAmount
+				,pro.exposureyn               exposureYn
+			from product pro
+			     ,codegroupdetail code2
+			where  pro.productid = #{productId}
+			 and   code2.codegroupid ='PRODUCTTYPE'
+			 and   code2.code = pro.producttype
+			
+    </select>
+    
+    
+    <update id="updateProduct">
+     UPDATE product
+  SET 
+    subscribestartdatetime = replace(#{subscribeStartDateTime},'-','')
+    ,subscribeenddatetime  = replace(#{subscribeEndDateTime},'-','')
+     ,productstate = 'OPERATION'    <!-- #{productstate} -->
+    ,priceamount = REGEXP_REPLACE(#{priceAmount}, ',|\%|원','')
+    ,suspendpriceamount = #{suspendPriceAmount}
+    ,packagepricebandwidth = #{packagePriceBandwidth}
+    ,productdescription = #{productDescription}
+  WHERE 
+    productid = #{productId}
+    </update>
+    
+    
+    <update id="updateProductPackage">
+    	UPDATE productpackage
+		SET 
+			 effectstartdatetime = replace(#{effectStartDateTime},'-','')
+			 ,effectenddatetime  = replace(#{effectEndDateTime},'-','')
+ 			 ,auditid = 'TEST'
+			 ,auditdatetime = NOW() 
+		WHERE 
+			 packageid = #{packageId}
+		 AND mainproductid = #{mainProductId}
+		 AND compositionproductid = #{compositionProductId} 
+    </update>
+    
+   	<select id="findProductPackageid" resultMap="productPackageResult">
+ 		SELECT CONCAT('PKG',NEXTVAL(productid_seq)) as packageid
+ 	</select>
+ 	
+   	<insert id="saveProductPackage">
+		INSERT 
+		INTO productpackage
+			 (
+			 packageid
+			 ,providernumber
+			 ,mainproductid
+			 ,compositionproductid
+			 ,effectstartdatetime
+			 ,effectenddatetime
+			 ,lasthistoryyn
+			 ,auditid
+			 ,auditdatetime
+			 )
+		VALUES(
+				#{packageId}
+				,#{providernumber}					<!-- #{providerNumber} -->				
+				,#{mainProductId}
+				,#{compositionProductId}
+				,replace(#{effectStartDateTime},'-','')
+				,replace(#{effectEndDateTime},'-','')
+				,'Y'						<!-- #{lastHistoryYn} --> 
+				,'Owner'
+				,NOW()
+				)		
+	</insert>
+ 	
+	
+	<select id="findDiscountBySearchBar" resultMap="discountResult" parameterType="DiscountSearchBar">
+	  SELECT d.discountid AS discountid
+          , d.discountname AS discountname
+          , d.providernumber AS providernumber
+          , code.codename AS discounttype
+          , code2.codename AS discountstate
+          , DATE_FORMAT(d.subscribestartdatetime , '%Y-%m-%d' ) AS subscribestartdatetime
+          , DATE_FORMAT(d.subscribeenddatetime , '%Y-%m-%d' ) AS subscribeenddatetime
+          , CASE 
+		 		WHEN code.code = 'RATE' THEN CONCAT(FORMAT(d.discountvalue,0), '%')
+			 	WHEN code.code = 'AMOUNT' THEN CONCAT(FORMAT(d.discountvalue,0), '원')
+			 ELSE d.discountvalue
+			 END discountvalue
+          , d.discountdescription AS discountdescription
+          , d.beforediscountid AS beforediscountid
+          , d.exposureyn AS exposureyn
+          , d.lastchangedatetime AS lastchangedatetime
+          , d.auditid AS auditid
+          , d.auditdatetime AS auditdatetime
+	  FROM   discount d
+	  		,codegroupdetail code
+	  		,codegroupdetail code2
+	  WHERE  d.discounttype LIKE CONCAT('%', #{discountType}, '%')
+	  AND    d.discountname LIKE CONCAT('%', #{discountName}, '%')
+	  AND    d.discounttype NOT IN ('DELIVERY', 'SETUPCOST', 'ETC')
+	  AND    code.codegroupid ='DISCOUNTTYPE'
+	  AND    code.code = d.discounttype
+	  AND    code2.codegroupid ='DISCOUNTSTATE'
+	  AND	 code2.code = d.discountstate
+	  AND	 d.providernumber = #{providernumber}
+	  ORDER BY code.codename,  d.discountid	  
+	</select>
+	
+	<select id="findDiscountId" resultMap="discountResult">
+		SELECT CONCAT('DIS',NEXTVAL(discountid_seq)) as discountid
+	</select>
+	
+		<insert id="saveDiscount">
+		INSERT 
+		INTO   discount
+		       (
+		          discountid
+				    , discountname
+				    , providernumber
+				    , discounttype
+				    , discountstate
+				    , subscribestartdatetime
+				    , subscribeenddatetime
+				    , discountvalue
+				    , discountdescription
+				    , beforediscountid
+				    , exposureyn
+				    , lastchangedatetime
+				    , auditid
+				    , auditdatetime
+				  )
+		VALUES (
+		          #{discountId}
+				    , #{discountName}
+				    , #{providernumber}
+				    , #{discountType}
+				    , 'OPERATION'
+				    , replace(#{subscribeStartDateTime},'-','')
+				    , replace(#{subscribeEndDateTime},'-','')
+				    <!-- , #{discountValue} -->
+				    , REGEXP_REPLACE(#{discountValue}, ',|\%|원','')
+				    , #{discountDescription}
+				    , ''
+				    , 'Y'
+				    , ''
+		        , 'TEST'
+		        , NOW()
+		        )
+	</insert>
+	
+	<update id="saveDiscountUpdate">
+		UPDATE discount 
+		SET    discountname = #{discountName}
+			   <!-- , discounttype = #{discountType} -->
+			   <!-- , discountstate = #{discountState} -->
+			   , subscribestartdatetime = replace(#{subscribeStartDateTime},'-','')
+			   , subscribeenddatetime = replace(#{subscribeEndDateTime},'-','')
+			   , discountvalue = REGEXP_REPLACE(#{discountValue}, ',|\%|원','') <!-- #{discountValue} -->
+			   , discountdescription = #{discountDescription}
+			   , auditid = 'TEST'
+			   , auditdatetime = NOW()  
+		WHERE  discountid = #{discountId}
+  	</update>
+  	
+  	
+  	<select id="findDiscountByDiscountId" resultMap="discountResult" parameterType="com.api.billing.model.product.Discount">
+		SELECT d.discountid AS discountid
+		     , d.discountname AS discountname
+		     , d.providernumber AS providernumber
+		     , d.discounttype AS discounttype
+		     , d.discountstate AS discountstate
+		     , d.subscribestartdatetime AS subscribestartdatetime
+		     , d.subscribeenddatetime AS subscribeenddatetime
+		     , d.discountvalue AS discountvalue
+		     , d.discountorder AS discountorder
+		     , d.discountdescription AS discountdescription
+		     , d.beforediscountid AS beforediscountid
+		     , d.exposureyn AS exposureyn
+		     , d.lastchangedatetime AS lastchangedatetime
+		     , d.discounttype2 AS discounttype2
+		     , d.discounttype2value AS discounttype2value
+		FROM   discount d
+		WHERE  discountid = #{discountId}
+	</select>
+	
+	<select id="findProductByProductId" resultMap="productResult" parameterType="com.api.billing.model.product.Product3">
+		SELECT p.productid AS productid
+		     , p.productname AS productname
+		     , p.providernumber AS providernumber
+		     , p.producttype AS producttype
+		     , p.productstate AS productstate
+		     , p.subscribestartdatetime AS subscribestartdatetime
+		     , p.subscribeenddatetime AS subscribeenddatetime
+		     , p.recurringdeliveryyn AS recurringdeliveryyn
+		     , p.priceamount AS priceamount
+		     , p.taxobjectyn AS taxobjectyn
+		     , p.packageyn AS packageyn
+		     , p.packagepricereferenceyn AS packagepricereferenceyn
+		     , p.packagevarietyyn AS packagevarietyyn
+		     , p.packagepricebandwidth AS packagepricebandwidth
+		     , p.productdescription AS productdescription
+		     , p.beforeproductid AS beforeproductid
+		     , p.suspendpriceamount AS suspendpriceamount
+		     , p.exposureyn AS exposureyn
+		     , p.lastchangedatetime AS lastchangedatetime
+		FROM   product p
+		WHERE  p.productid = #{productId}
+	</select>
+	
+	<select id="findProductPackageByMainProductId" resultMap="productPackageResult" parameterType="com.api.billing.model.product.ProductPackage">
+		SELECT pp.packageid AS packageid
+		     , pp.providernumber AS providernumber
+		     , pp.mainproductid AS mainproductid
+		     , pp.compositionproductid AS compositionproductid
+		     , pp.effectstartdatetime AS effectstartdatetime
+		     , pp.effectenddatetime AS effectenddatetime
+		     , pp.lasthistoryyn AS lasthistoryyn
+		FROM   productpackage pp
+		WHERE  pp.mainproductid = #{mainProductId}
+		LIMIT  1
+	</select>
+	
+	
+	<!--page tot count  -->
+	<select id="getProductTotCount" resultType="int" parameterType = "ProductInput" >
+			select  count(1)
+			from product pro
+			     ,codegroupdetail code1 
+			     ,codegroupdetail code2
+			where  pro.producttype like concat('%',#{productType},'%')
+			 and   pro.productname like concat('%',#{productName},'%')
+			 and   pro.exposureyn ='Y'
+			 and   code1.codegroupid ='PRODUCTSTATE'
+			 and   code1.code = pro.productstate
+			 and   code2.codegroupid ='PRODUCTTYPE'
+			 and   code2.code = pro.producttype
+			 and   pro.providernumber = #{providernumber}
+			 
+	</select>
+	
+</mapper>
